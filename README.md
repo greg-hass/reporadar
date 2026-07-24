@@ -12,15 +12,11 @@ cp .env.example .env
 # 2. Build and run
 docker compose up -d --build
 
-# 3. Apply the database schema (one time)
-docker compose exec app node dist-server/scripts/run-migration.mjs
-# (or run the SQL in supabase/migrations/001_init.sql against the db container)
-
-# 4. Open the app
+# 3. Open the app
 open http://localhost:3000
 ```
 
-The first star snapshot runs automatically on startup, then hourly. Risers become meaningful after the job has run on at least two different hours.
+The database schema is applied automatically on startup (idempotent), so no manual migration step is needed. The first star snapshot runs automatically on startup, then hourly. Risers become meaningful after the job has run on at least two different hours.
 
 ## Updating (prebuilt image from GHCR)
 
@@ -45,7 +41,7 @@ Or make the package public (GitHub → Packages → reporadar → Package settin
 - **Search** — keyword + filters (language, min stars, created-since), sorted by stars/date/relevance. Live GitHub Search API.
 - **New** — repos created in the last 1/7/30 days.
 - **Fast Risers** — repos gaining the most stars over 1d/7d/30d, with inline sparklines. Computed from the hourly snapshots.
-- **Themes** — Aurora (default) / GitHub Dark / Light, toggleable in the sidebar.
+- **Themes** — Aurora (default) / GitHub Dark / Tokyo Night / Light, toggleable in the sidebar.
 
 ## Architecture
 
@@ -55,6 +51,7 @@ Or make the package public (GitHub → Packages → reporadar → Package settin
 │  • serves the built React frontend (dist/)   │
 │  • /api/search   → live GitHub Search API    │
 │  • /api/risers   → computed from Postgres    │
+│  • /api/stats    → dashboard counters        │
 │  • /api/repos/:id/history → star snapshots   │
 │  • node-cron: hourly star-tracking job       │
 └───────────────────┬─────────────────────────┘

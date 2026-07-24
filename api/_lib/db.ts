@@ -17,6 +17,50 @@ function parseConn(cs: string): { host: string; port: number; user: string; pass
   };
 }
 
+// Schema DDL — keep in sync with supabase/migrations/001_init.sql.
+// Applied automatically at server startup so fresh deployments self-provision
+// (all statements are idempotent).
+const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS repos (
+  id              bigint PRIMARY KEY,
+  full_name       text NOT NULL,
+  description     text,
+  language        text,
+  topics          text[] NOT NULL DEFAULT '{}',
+  stars_total     integer NOT NULL DEFAULT 0,
+  forks           integer NOT NULL DEFAULT 0,
+  created_at      timestamptz NOT NULL,
+  pushed_at       timestamptz NOT NULL,
+  license         text,
+  owner_avatar    text NOT NULL,
+  html_url        text NOT NULL,
+  updated_from_gh timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS star_snapshots (
+  repo_id     bigint NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  captured_at timestamptz NOT NULL,
+  stars       integer NOT NULL,
+  PRIMARY KEY (repo_id, captured_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_star_snap_repo_time ON star_snapshots (repo_id, captured_at DESC);
+CREATE INDEX IF NOT EXISTS idx_star_snap_captured ON star_snapshots (captured_at);
+CREATE INDEX IF NOT EXISTS idx_repos_language ON repos (language);
+`;
+
+/** Creates the schema if missing. Safe to call on every boot. */
+export async function ensureSchema(connStr: string): Promise<void> {
+  const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    await client.query(SCHEMA_SQL);
+  } finally {
+    await client.end();
+  }
+}
+
 /**
  * Upserts a repo and appends a star snapshot using a single connection.
  */
@@ -103,9 +147,43 @@ export async function queryRisers(connStr: string, windowDays: number, limit: nu
   }
 }
 
-/** Reads a star-history sparkline for one repo. */
-export async function queryHistory(connStr: string, repoId: number, days: number): Promise<number[]> {
+export interface RepoStats {
+  reposTracked: number;
+  snapshotsToday: number;
+  starsGainedToday: number;
+  lastSnapshotAt: string | null; // ISO
+}
+
+/** Dashboard counters for the Observatory stats band. */
+export async function queryStats(connStr: string): Promise<RepoStats> {
   const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    const res = await client.query(
+      `SELECT
+         (SELECT count(*) FROM repos) AS "reposTracked",
+         (SELECT count(*) FROM star_snapshots WHERE captured_at::date = now()::date) AS "snapshotsToday",
+         (SELECT COALESCE(SUM(latest - earliest), 0) FROM (
+            SELECT repo_id, max(stars) AS latest, min(stars) AS earliest
+            FROM star_snapshots WHERE captured_at::date = now()::date GROUP BY repo_id
+          ) t) AS "starsGainedToday",
+         (SELECT max(captured_at) FROM star_snapshots) AS "lastSnapshotAt"`
+    );
+    const r = res.rows[0];
+    return {
+      reposTracked: Number(r.reposTracked),
+      snapshotsToday: Number(r.snapshotsToday),
+      starsGainedToday: Number(r.starsGainedToday),
+      lastSnapshotAt: r.lastSnapshotAt ? new Date(r.lastSnapshotAt).toISOString() : null,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+/** Reads a star-history sparkline for one repo. */
+export async function queryHistory(connStr: string, repoId: number, days: number): Promise<number[]> {  const { Client } = await import("pg");
   const client = new Client(parseConn(connStr));
   await client.connect();
   try {

@@ -1,8 +1,9 @@
-export type ThemeName = "aurora" | "gh-dark" | "light";
+export type ThemeName = "aurora" | "gh-dark" | "tokyo-night" | "light";
 
 const DATA_THEME: Record<ThemeName, string | null> = {
   aurora: null,           // :root default; no data-theme attr
   "gh-dark": "gh-dark",
+  "tokyo-night": "tokyo-night",
   light: "light",
 };
 

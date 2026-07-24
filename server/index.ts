@@ -2,7 +2,7 @@ import express from "express";
 import path from "node:path";
 import cron from "node-cron";
 import { githubSearch, type NormalizedRepo, type SearchQuery } from "../api/_lib/github";
-import { upsertAndSnapshot, queryRisers, queryHistory } from "../api/_lib/db";
+import { upsertAndSnapshot, queryRisers, queryHistory, queryStats, ensureSchema } from "../api/_lib/db";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -61,6 +61,20 @@ app.get("/api/risers", async (req, res) => {
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : "risers failed" });
+  }
+});
+
+// GET /api/stats — dashboard counters (repos tracked, snapshots today, stars gained, last run)
+app.get("/api/stats", async (_req, res) => {
+  const connStr = process.env.POSTGRES_URL ?? "";
+  if (!connStr) {
+    res.status(500).json({ error: "POSTGRES_URL not set" });
+    return;
+  }
+  try {
+    res.json(await queryStats(connStr));
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "stats failed" });
   }
 });
 
@@ -137,6 +151,16 @@ async function runTrackingJob(): Promise<void> {
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE ?? "0 * * * *";
 app.listen(PORT, async () => {
   console.log(`RepoRadar listening on :${PORT}`);
+  // Self-provision the schema (idempotent) so fresh deployments work without a manual migration.
+  const connStr = process.env.POSTGRES_URL ?? "";
+  if (connStr) {
+    try {
+      await ensureSchema(connStr);
+      console.log("[db] schema ready");
+    } catch (e) {
+      console.error("[db] schema init failed:", e instanceof Error ? e.message : e);
+    }
+  }
   if (cron.validate(CRON_SCHEDULE)) {
     cron.schedule(CRON_SCHEDULE, () => {
       runTrackingJob().catch((e) => console.error("[cron] job failed:", e));

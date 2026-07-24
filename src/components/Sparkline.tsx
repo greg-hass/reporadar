@@ -4,10 +4,12 @@ interface Props {
   points: number[];
   width?: number;
   height?: number;
+  /** draw an accent dot at the latest point */
+  endDot?: boolean;
 }
 
 /** Area + line sparkline over recent star snapshots. */
-export default function Sparkline({ points, width = 72, height = 28 }: Props) {
+export default function Sparkline({ points, width = 72, height = 28, endDot = false }: Props) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const gradId = `spark-area-${id}`;
   if (points.length < 2) return null;
@@ -42,6 +44,15 @@ export default function Sparkline({ points, width = 72, height = 28 }: Props) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      {endDot && (
+        <circle
+          cx={coords[coords.length - 1][0]}
+          cy={coords[coords.length - 1][1]}
+          r="2.4"
+          fill="var(--color-accent)"
+          style={{ filter: "drop-shadow(0 0 3px var(--color-accent))" }}
+        />
+      )}
     </svg>
   );
 }

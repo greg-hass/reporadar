@@ -39,6 +39,7 @@ export default function SearchPage() {
 
   return (
     <div className="max-w-4xl mx-auto w-full flex flex-col gap-4">
+      <div className="eyebrow">Query the archive</div>
       {/* key resets the input when the query changes from outside (e.g. example chips) */}
       <SearchBar key={q} initial={q} onSearch={(val) => patch({ q: val })} />
 

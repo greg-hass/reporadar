@@ -31,7 +31,8 @@ export default function NewPage() {
             <SparklesIcon size={19} />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">New repos</h1>
+            <div className="eyebrow !text-[9px]">Fresh signals</div>
+            <h1 className="text-lg font-bold leading-tight mt-0.5">New repos</h1>
             <p className="text-xs text-muted">Freshly created and already gaining stars</p>
           </div>
         </div>

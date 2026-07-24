@@ -19,6 +19,13 @@ export interface Repo {
 
 export type SortKey = "stars" | "updated" | "best-match" | "risers";
 
+export interface Stats {
+  reposTracked: number;
+  snapshotsToday: number;
+  starsGainedToday: number;
+  lastSnapshotAt: string | null; // ISO
+}
+
 export interface SearchParams {
   q: string;
   language?: string;

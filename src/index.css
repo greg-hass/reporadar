@@ -27,6 +27,18 @@
   --color-success: #3fb950;
 }
 
+[data-theme="tokyo-night"] {
+  --color-bg: #1a1b26;
+  --color-surface: #1f2335;
+  --color-elevated: #24283b;
+  --color-border: #3b4261;
+  --color-text: #c0caf5;
+  --color-muted: #565f89;
+  --color-primary: #7aa2f7;
+  --color-accent: #7dcfff;
+  --color-success: #9ece6a;
+}
+
 [data-theme="light"] {
   --color-bg: #f6f8fa;
   --color-surface: #ffffff;
@@ -178,5 +190,95 @@ body::before {
     );
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
+  }
+
+  /* ── Observatory primitives ─────────────────────────────── */
+
+  /* Uppercase micro label above page titles. */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  /* Glassy stats-band panel with a hairline top glow. */
+  .stat-panel {
+    position: relative;
+    background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    overflow: hidden;
+  }
+  .stat-panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-accent) 60%, transparent), transparent);
+  }
+
+  /* Live indicator dot with an expanding ring. */
+  .pulse-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background-color: var(--color-success);
+    flex-shrink: 0;
+  }
+  .pulse-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    border: 1px solid var(--color-success);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  /* Ultra-subtle rotating radar sweep behind the page content. */
+  .radar-bg {
+    position: fixed;
+    top: -40vmax;
+    right: -40vmax;
+    width: 90vmax;
+    height: 90vmax;
+    z-index: -1;
+    pointer-events: none;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      color-mix(in srgb, var(--color-primary) 7%, transparent) 40deg,
+      transparent 80deg
+    );
+    animation: radar-sweep 9s linear infinite;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes radar-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot::after,
+  .radar-bg {
+    animation: none;
   }
 }

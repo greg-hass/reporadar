@@ -1,4 +1,4 @@
-import type { Repo, SearchParams } from "./types";
+import type { Repo, SearchParams, Stats } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
@@ -31,4 +31,8 @@ export async function fetchRisers(window: "1d" | "7d" | "30d", page = 1): Promis
 
 export async function fetchHistory(id: number, days = 30): Promise<{ points: number[] }> {
   return getJson(`/repos/${id}/history${toQuery({ days })}`);
+}
+
+export async function fetchStats(): Promise<Stats> {
+  return getJson("/stats");
 }

@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { applyTheme, getStoredTheme, type ThemeName } from "../lib/theme";
-import { MoonIcon, SparklesIcon, SunIcon } from "./icons";
+import { MoonIcon, SparklesIcon, StarIcon, SunIcon } from "./icons";
 
-const ORDER: ThemeName[] = ["aurora", "gh-dark", "light"];
-const LABEL: Record<ThemeName, string> = { aurora: "Aurora", "gh-dark": "GitHub Dark", light: "Light" };
-const ICON = { aurora: SparklesIcon, "gh-dark": MoonIcon, light: SunIcon } as const;
+const ORDER: ThemeName[] = ["aurora", "gh-dark", "tokyo-night", "light"];
+const LABEL: Record<ThemeName, string> = {
+  aurora: "Aurora",
+  "gh-dark": "GitHub Dark",
+  "tokyo-night": "Tokyo Night",
+  light: "Light",
+};
+const ICON = { aurora: SparklesIcon, "gh-dark": MoonIcon, "tokyo-night": StarIcon, light: SunIcon } as const;
 
 interface Props {
   /** "row" shows icon + label (sidebar); "icon" is a compact button (header). */
