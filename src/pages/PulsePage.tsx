@@ -10,9 +10,9 @@ import { useSearch } from "../hooks/useSearch";
 import { relativeTime } from "../lib/format";
 import type { Repo } from "../lib/types";
 
-function PanelHeader({ title, to }: { title: string; to?: string }) {
+function SectionHeader({ title, to }: { title: string; to?: string }) {
   return (
-    <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border/60">
+    <div className="flex items-center justify-between px-1 pb-2">
       <span className="eyebrow !text-[9px]">{title}</span>
       {to && (
         <Link to={to} className="text-[11px] text-muted hover:text-primary transition-colors">
@@ -103,9 +103,9 @@ export default function PulsePage() {
             <>
               <HeroRiser repo={hero} />
               {topRisers.length > 0 && (
-                <div className="panel">
-                  <PanelHeader title="Top risers · 7d" to="/risers" />
-                  <div className="divide-y divide-border/60">
+                <section>
+                  <SectionHeader title="Top risers · 7d" to="/risers" />
+                  <div className="flex flex-col gap-2.5">
                     {topRisers.map((repo, i) => (
                       <RepoRow
                         key={repo.id}
@@ -124,24 +124,20 @@ export default function PulsePage() {
                       />
                     ))}
                   </div>
-                </div>
+                </section>
               )}
             </>
           )}
         </div>
 
-        <div className="panel">
-          <PanelHeader title="Fresh signals" to="/new" />
+        <section>
+          <SectionHeader title="Fresh signals" to="/new" />
           {fresh.isLoading ? (
-            <div className="p-4 flex flex-col gap-3">
-              {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="skeleton h-8 w-full" />
-              ))}
-            </div>
+            <RepoListSkeleton count={5} />
           ) : fresh.error ? (
-            <p className="text-muted text-xs p-4">{(fresh.error as Error).message}</p>
+            <p className="text-muted text-xs px-1">{(fresh.error as Error).message}</p>
           ) : (
-            <div className="divide-y divide-border/60">
+            <div className="flex flex-col gap-2.5">
               {freshRepos.map((repo, i) => (
                 <RepoRow
                   key={repo.id}
@@ -160,7 +156,7 @@ export default function PulsePage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

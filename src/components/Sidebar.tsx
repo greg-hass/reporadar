@@ -9,7 +9,7 @@ export default function Sidebar() {
   const { data } = useStats();
 
   return (
-    <aside className="hidden lg:flex w-[232px] shrink-0 flex-col border-r border-border/70 bg-surface/40 backdrop-blur sticky top-0 h-screen p-4">
+    <aside className="hidden lg:flex w-[232px] shrink-0 flex-col bg-surface/40 backdrop-blur sticky top-0 h-screen p-4">
       <div className="flex items-center gap-2.5 px-2">
         <Logo size={30} />
         <div>

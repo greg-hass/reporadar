@@ -266,13 +266,13 @@ body::before {
     overflow: hidden;
   }
 
-  /* A row inside a .panel; pair with divide-y on the parent. */
+  /* A leaderboard row; each row is its own .panel card in a gap-spaced stack. */
   .panel-row {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 14px 16px;
-    transition: background-color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
   }
   @media (min-width: 640px) {
     .panel-row {
@@ -283,6 +283,7 @@ body::before {
   }
   .panel-row:hover {
     background-color: color-mix(in srgb, var(--color-elevated) 45%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
   }
   .panel-row-selected,
   .panel-row-selected:hover {

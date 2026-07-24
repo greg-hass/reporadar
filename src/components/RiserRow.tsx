@@ -28,7 +28,7 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
   return (
     <div
       ref={ref}
-      className={`panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      className={`panel panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       <Rank n={rank} />
@@ -69,7 +69,7 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
         </div>
       )}
 
-      <div className="text-right shrink-0 border-l border-border/60 pl-3 sm:pl-5">
+      <div className="text-right shrink-0 pl-1 sm:pl-3">
         <div className="font-mono tabular-nums text-xl sm:text-2xl font-bold text-success leading-none">
           +{perDay.toLocaleString()}
         </div>

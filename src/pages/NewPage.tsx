@@ -72,7 +72,7 @@ export default function NewPage() {
         <EmptyState title="Nothing new here" hint="No recently created repos matched. Try a wider window." />
       ) : (
         <>
-          <div className="panel divide-y divide-border/60">
+          <div className="flex flex-col gap-2.5">
             {items.map((repo, i) => (
               <RepoRow
                 key={repo.id}

@@ -64,7 +64,7 @@ export default function RisersPage() {
         />
       ) : (
         <>
-          <div className="panel divide-y divide-border/60">
+          <div className="flex flex-col gap-2.5">
             {items.map((repo, i) =>
               density === "compact" ? (
                 <RepoRow

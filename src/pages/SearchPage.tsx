@@ -106,7 +106,7 @@ export default function SearchPage() {
             <EmptyState title="No repos found" hint="Try a broader query or loosen the filters above." />
           ) : (
             <>
-              <div className="panel divide-y divide-border/60">
+              <div className="flex flex-col gap-2.5">
                 {items.map((repo, i) => (
                   <RepoRow
                     key={repo.id}

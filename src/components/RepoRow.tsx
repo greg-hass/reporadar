@@ -17,11 +17,11 @@ interface Props {
   right?: ReactNode;
 }
 
-/** The one row used by every list in the app, inside a `.panel` with divide-y. */
+/** The one row used by every list in the app — a standalone panel card. */
 export default function RepoRow({ repo, rank, selected, compact, stagger = 0, right }: Props) {
   return (
     <div
-      className={`panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      className={`panel panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       {rank !== undefined && <Rank n={rank} />}
