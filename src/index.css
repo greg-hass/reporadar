@@ -257,6 +257,46 @@ body::before {
     );
     animation: radar-sweep 9s linear infinite;
   }
+
+  /* Leaderboard panel: one bordered surface holding hairline-divided rows. */
+  .panel {
+    background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* A row inside a .panel; pair with divide-y on the parent. */
+  .panel-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    transition: background-color 0.15s ease;
+  }
+  @media (min-width: 640px) {
+    .panel-row {
+      gap: 20px;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+  }
+  .panel-row:hover {
+    background-color: color-mix(in srgb, var(--color-elevated) 45%, transparent);
+  }
+  .panel-row-selected,
+  .panel-row-selected:hover {
+    background-color: color-mix(in srgb, var(--color-elevated) 70%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-accent);
+  }
+
+  /* Gradient display text for hero numbers. */
+  .gradient-text {
+    background-image: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 @keyframes pulse-ring {

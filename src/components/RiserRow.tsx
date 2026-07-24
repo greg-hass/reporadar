@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { Repo } from "../lib/types";
 import Sparkline from "./Sparkline";
+import LanguageDot from "./LanguageDot";
+import Rank from "./Rank";
 
 interface Props {
   repo: Repo;
@@ -12,18 +14,7 @@ interface Props {
   stagger: number;
 }
 
-function LanguageDot({ language }: { language: string | null }) {
-  let hash = 0;
-  if (language) for (const c of language) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
-  const hue = language ? hash % 360 : 0;
-  return (
-    <span
-      className="inline-block w-2 h-2 rounded-full mr-1.5 shrink-0"
-      style={{ backgroundColor: language ? `hsl(${hue} 60% 60%)` : "var(--color-muted)" }}
-    />
-  );
-}
-
+/** Leaderboard row for Fast Risers: identity + trajectory + velocity hero. */
 export default function RiserRow({ repo, rank, windowDays, window, selected, stagger }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -37,23 +28,10 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
   return (
     <div
       ref={ref}
-      className={`card flex items-center gap-3 sm:gap-5 px-4 sm:px-5 py-4 animate-fade-up ${
-        selected ? "!border-primary/60 !bg-elevated/50" : "hover:border-primary/40"
-      }`}
+      className={`panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
-      <span
-        className={`font-mono tabular-nums text-xl sm:text-2xl font-extrabold w-8 shrink-0 text-center ${
-          rank === 1 ? "text-transparent bg-clip-text" : "text-border"
-        }`}
-        style={
-          rank === 1
-            ? { backgroundImage: "linear-gradient(135deg, var(--color-accent), var(--color-primary))" }
-            : undefined
-        }
-      >
-        {String(rank).padStart(2, "0")}
-      </span>
+      <Rank n={rank} />
 
       <img
         src={repo.ownerAvatar}

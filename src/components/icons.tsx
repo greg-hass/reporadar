@@ -41,6 +41,8 @@ export const TrendingUpIcon = make(
   </>
 );
 
+export const ActivityIcon = make(<path d="M3 12h4l3 8 4-16 3 8h4" />);
+
 export const StarIcon = make(
   <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9 2.9-6z" />
 );

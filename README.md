@@ -38,10 +38,13 @@ Or make the package public (GitHub → Packages → reporadar → Package settin
 
 ## What it does
 
-- **Search** — keyword + filters (language, min stars, created-since), sorted by stars/date/relevance. Live GitHub Search API.
+- **Pulse** — the home dashboard: stats band (repos tracked, snapshots, stars gained), the #1 riser of the week, top risers, and freshly created repos at a glance.
+- **Search** (`/search`) — keyword + filters (language, min stars, created-since), sorted by stars/date/relevance. Live GitHub Search API.
 - **New** — repos created in the last 1/7/30 days.
-- **Fast Risers** — repos gaining the most stars over 1d/7d/30d, with inline sparklines. Computed from the hourly snapshots.
+- **Fast Risers** — repos gaining the most stars over 1d/7d/30d, with velocity-per-day figures and inline sparklines. Computed from the hourly snapshots.
 - **Themes** — Aurora (default) / GitHub Dark / Tokyo Night / Light, toggleable in the sidebar.
+
+Every list supports keyboard navigation: `j` / `k` to move, `↵` to open, `/` to jump to search.
 
 ## Architecture
 

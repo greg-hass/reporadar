@@ -3,15 +3,25 @@ import SearchBar from "../components/SearchBar";
 import FilterRail from "../components/FilterRail";
 import SortControl from "../components/SortControl";
 import DensityToggle from "../components/DensityToggle";
-import RepoCard from "../components/RepoCard";
+import RepoRow from "../components/RepoRow";
 import RepoListSkeleton from "../components/Skeleton";
 import { EmptyState, ErrorState } from "../components/States";
 import { Logo } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
 import { useDensity } from "../hooks/useDensity";
-import type { SortKey } from "../lib/types";
+import { useRovingKeys } from "../hooks/useRovingKeys";
+import type { Repo, SortKey } from "../lib/types";
 
 const EXAMPLES = ["terminal emulator", "llm agent framework", "self-hosted dashboard"];
+
+function starsBlock(repo: Repo) {
+  return (
+    <div className="hidden md:block text-right shrink-0">
+      <div className="font-mono tabular-nums text-sm">{repo.starsTotal.toLocaleString()}</div>
+      <div className="text-[9px] uppercase tracking-wider text-muted">stars</div>
+    </div>
+  );
+}
 
 export default function SearchPage() {
   const [sp, setSp] = useSearchParams();
@@ -22,7 +32,19 @@ export default function SearchPage() {
   const sort = (sp.get("sort") as SortKey) ?? "best-match";
   const [density, setDensity] = useDensity();
 
+  const enabled = q.length > 0;
+  const { data, isLoading, error, refetch } = useSearch(
+    { q, language: language || undefined, minStars: minStars || undefined, createdSinceDays: createdSinceDays || undefined, sort },
+    enabled
+  );
+
+  const items = data?.items ?? [];
+  const { sel, reset } = useRovingKeys(items.length, (i) => {
+    window.open(items[i].htmlUrl, "_blank", "noreferrer");
+  });
+
   const patch = (p: Record<string, string | number>) => {
+    reset();
     const next = new URLSearchParams(sp);
     for (const [k, v] of Object.entries(p)) {
       if (v === "" || v === 0) next.delete(k);
@@ -31,14 +53,8 @@ export default function SearchPage() {
     setSp(next);
   };
 
-  const enabled = q.length > 0;
-  const { data, isLoading, error, refetch } = useSearch(
-    { q, language: language || undefined, minStars: minStars || undefined, createdSinceDays: createdSinceDays || undefined, sort },
-    enabled
-  );
-
   return (
-    <div className="max-w-4xl mx-auto w-full flex flex-col gap-4">
+    <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
       <div className="eyebrow">Query the archive</div>
       {/* key resets the input when the query changes from outside (e.g. example chips) */}
       <SearchBar key={q} initial={q} onSearch={(val) => patch({ q: val })} />
@@ -74,7 +90,7 @@ export default function SearchPage() {
             onChange={patch}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-muted text-sm">
+            <span className="eyebrow !text-[10px]">
               {isLoading ? "Searching…" : data ? `${data.total.toLocaleString()} results` : ""}
             </span>
             <div className="flex gap-2 items-center ml-auto">
@@ -83,20 +99,32 @@ export default function SearchPage() {
             </div>
           </div>
           {isLoading ? (
-            <RepoListSkeleton density={density} />
+            <RepoListSkeleton />
           ) : error ? (
             <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
-          ) : data && data.items.length === 0 ? (
-            <EmptyState
-              title="No repos found"
-              hint="Try a broader query or loosen the filters above."
-            />
+          ) : items.length === 0 ? (
+            <EmptyState title="No repos found" hint="Try a broader query or loosen the filters above." />
           ) : (
-            <div className="flex flex-col gap-3">
-              {data?.items.map((repo, i) => (
-                <RepoCard key={repo.id} repo={repo} density={density} stagger={i} />
-              ))}
-            </div>
+            <>
+              <div className="panel divide-y divide-border/60">
+                {items.map((repo, i) => (
+                  <RepoRow
+                    key={repo.id}
+                    repo={repo}
+                    rank={i + 1}
+                    selected={sel === i}
+                    compact={density === "compact"}
+                    stagger={i}
+                    right={starsBlock(repo)}
+                  />
+                ))}
+              </div>
+              <p className="hidden md:block text-[11px] text-muted text-right">
+                <kbd className="border border-border rounded px-1">j</kbd>{" "}
+                <kbd className="border border-border rounded px-1">k</kbd> navigate ·{" "}
+                <kbd className="border border-border rounded px-1">↵</kbd> open
+              </p>
+            </>
           )}
         </>
       )}
