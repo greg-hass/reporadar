@@ -15,7 +15,8 @@ services:
       retries: 10
 
   app:
-    build: .
+    image: ghcr.io/greg-hass/reporadar:latest
+    build: .   # used when building locally instead of pulling from GHCR
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"

@@ -22,6 +22,24 @@ open http://localhost:3000
 
 The first star snapshot runs automatically on startup, then hourly. Risers become meaningful after the job has run on at least two different hours.
 
+## Updating (prebuilt image from GHCR)
+
+Every push to `main` builds and publishes `ghcr.io/greg-hass/reporadar:latest` via GitHub Actions (see `.github/workflows/docker.yml`). On the server:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+If the GHCR package is private (the default), log in on the server once first:
+
+```bash
+# PAT with read:packages scope — https://github.com/settings/tokens
+docker login ghcr.io -u greg-hass
+```
+
+Or make the package public (GitHub → Packages → reporadar → Package settings → Change visibility) and no login is needed.
+
 ## What it does
 
 - **Search** — keyword + filters (language, min stars, created-since), sorted by stars/date/relevance. Live GitHub Search API.

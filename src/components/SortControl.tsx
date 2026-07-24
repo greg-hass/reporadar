@@ -1,4 +1,5 @@
 import type { SortKey } from "../lib/types";
+import { ChevronDownIcon } from "./icons";
 
 interface Props {
   value: SortKey;
@@ -13,14 +14,21 @@ const OPTIONS: { value: SortKey; label: string }[] = [
 
 export default function SortControl({ value, onChange }: Props) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as SortKey)}
-      className="bg-bg border border-border rounded-md px-2 py-1.5 text-text text-sm"
-    >
-      {OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
+    <span className="relative inline-block">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as SortKey)}
+        aria-label="Sort results"
+        className="select !py-1.5 text-[13px]"
+      >
+        {OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <ChevronDownIcon
+        size={14}
+        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
+      />
+    </span>
   );
 }

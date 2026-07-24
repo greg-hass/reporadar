@@ -7,14 +7,21 @@ interface Props {
 
 export default function DensityToggle({ value, onChange }: Props) {
   return (
-    <div className="flex border border-border rounded-md overflow-hidden text-xs">
+    <div
+      role="group"
+      aria-label="Card density"
+      className="flex rounded-lg border border-border bg-bg p-0.5 text-xs"
+    >
       {(["rich", "compact"] as Density[]).map((d) => (
         <button
           key={d}
           onClick={() => onChange(d)}
-          className={`px-2.5 py-1 ${value === d ? "bg-primary text-white" : "text-muted hover:text-text"}`}
+          aria-pressed={value === d}
+          className={`px-3 py-1.5 min-h-[32px] rounded-md capitalize transition-colors ${
+            value === d ? "bg-primary text-white font-semibold" : "text-muted hover:text-text"
+          }`}
         >
-          {d === "rich" ? "Rich" : "Compact"}
+          {d}
         </button>
       ))}
     </div>

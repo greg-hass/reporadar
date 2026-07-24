@@ -4,9 +4,14 @@ import FilterRail from "../components/FilterRail";
 import SortControl from "../components/SortControl";
 import DensityToggle from "../components/DensityToggle";
 import RepoCard from "../components/RepoCard";
+import RepoListSkeleton from "../components/Skeleton";
+import { EmptyState, ErrorState } from "../components/States";
+import { Logo } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
 import { useDensity } from "../hooks/useDensity";
 import type { SortKey } from "../lib/types";
+
+const EXAMPLES = ["terminal emulator", "llm agent framework", "self-hosted dashboard"];
 
 export default function SearchPage() {
   const [sp, setSp] = useSearchParams();
@@ -27,39 +32,72 @@ export default function SearchPage() {
   };
 
   const enabled = q.length > 0;
-  const { data, isLoading, error } = useSearch(
+  const { data, isLoading, error, refetch } = useSearch(
     { q, language: language || undefined, minStars: minStars || undefined, createdSinceDays: createdSinceDays || undefined, sort },
     enabled
   );
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col gap-4">
-      <SearchBar initial={q} onSearch={(val) => patch({ q: val })} />
-      <FilterRail
-        language={language}
-        minStars={minStars}
-        createdSinceDays={createdSinceDays}
-        onChange={patch}
-      />
-      {enabled && (
-        <div className="flex items-center justify-between">
-          <span className="text-muted text-sm">
-            {isLoading ? "Searching…" : data ? `${data.total.toLocaleString()} results` : ""}
-          </span>
-          <div className="flex gap-2 items-center">
-            <DensityToggle value={density} onChange={setDensity} />
-            <SortControl value={sort} onChange={(s) => patch({ sort: s })} />
+    <div className="max-w-4xl mx-auto w-full flex flex-col gap-4">
+      {/* key resets the input when the query changes from outside (e.g. example chips) */}
+      <SearchBar key={q} initial={q} onSearch={(val) => patch({ q: val })} />
+
+      {!enabled ? (
+        <div className="flex flex-col items-center text-center pt-14 md:pt-24 pb-10 animate-fade-up">
+          <Logo size={56} />
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-6">
+            Find your next favorite repo
+          </h1>
+          <p className="text-muted text-sm md:text-base mt-2.5 max-w-md">
+            Search across GitHub with filters for language, stars, and freshness — or browse
+            what's new and what's rising.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 mt-7">
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                onClick={() => patch({ q: ex })}
+                className="text-xs px-3.5 py-2 rounded-full bg-surface border border-border text-muted hover:text-text hover:border-primary/50 transition-colors"
+              >
+                {ex}
+              </button>
+            ))}
           </div>
         </div>
-      )}
-      {error && <p className="text-red-400 text-sm">{(error as Error).message}</p>}
-      <div className="flex flex-col gap-3">
-        {data?.items.map((repo) => (
-          <RepoCard key={repo.id} repo={repo} density={density} />
-        ))}
-      </div>
-      {!enabled && (
-        <p className="text-muted text-sm">Type a query above to search across GitHub.</p>
+      ) : (
+        <>
+          <FilterRail
+            language={language}
+            minStars={minStars}
+            createdSinceDays={createdSinceDays}
+            onChange={patch}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-muted text-sm">
+              {isLoading ? "Searching…" : data ? `${data.total.toLocaleString()} results` : ""}
+            </span>
+            <div className="flex gap-2 items-center ml-auto">
+              <DensityToggle value={density} onChange={setDensity} />
+              <SortControl value={sort} onChange={(s) => patch({ sort: s })} />
+            </div>
+          </div>
+          {isLoading ? (
+            <RepoListSkeleton density={density} />
+          ) : error ? (
+            <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
+          ) : data && data.items.length === 0 ? (
+            <EmptyState
+              title="No repos found"
+              hint="Try a broader query or loosen the filters above."
+            />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {data?.items.map((repo, i) => (
+                <RepoCard key={repo.id} repo={repo} density={density} stagger={i} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
