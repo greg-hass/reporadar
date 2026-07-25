@@ -70,7 +70,7 @@ app.get("/api/repos/:id/history", (req, res) => {
 
 app.get("/api/repo/:owner/:name/readme", (_req, res) => {
   res.json({
-    html: `<h1>ghostty</h1><p>Ghostty is a fast, feature-rich, and cross-platform <strong>terminal emulator</strong> that uses platform-native UI and GPU acceleration.</p><h2>Features</h2><ul><li>Multi-window, tabs, and splits</li><li>GPU-accelerated rendering (Metal, OpenGL)</li><li>Native macOS and GTK Linux UI</li><li>Rich theme support with 100+ built-in themes</li></ul><h2>Quick Start</h2><pre><code>brew install --cask ghostty</code></pre><p>See the <a href="https://ghostty.org/docs">documentation</a> for configuration options.</p><blockquote>Ghostty is a terminal emulator that differentiates itself by being fast, feature-rich, and native.</blockquote>`,
+    html: `<p><a href="https://github.com/mikiarlo3/ai-copywriter/blob/HEAD/assets/banner.png"><img src="https://raw.githubusercontent.com/mikiarlo3/ai-copywriter/HEAD/assets/banner.png"></a></p><h1>ghostty</h1><p>Ghostty is a fast, feature-rich, and cross-platform <strong>terminal emulator</strong> that uses platform-native UI and GPU acceleration.</p><h2>Features</h2><ul><li>Multi-window, tabs, and splits</li><li>GPU-accelerated rendering (Metal, OpenGL)</li><li>Native macOS and GTK Linux UI</li><li>Rich theme support with 100+ built-in themes</li></ul><h2>Quick Start</h2><pre><code>brew install --cask ghostty</code></pre><p>See the <a href="https://ghostty.org/docs">documentation</a> for configuration options.</p>`,
   });
 });
 

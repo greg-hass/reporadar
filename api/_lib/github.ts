@@ -108,7 +108,35 @@ export async function githubRepoById(id: number, token: string): Promise<Normali
   return normalize((await res.json()) as GhRepo);
 }
 
-/** Fetches the README as GitHub-rendered HTML (relative links already resolved). Null when absent. */
+/** Rewrites relative src/href/srcset URLs to absolute raw/github URLs for the repo's default branch. */
+export function absolutizeUrls(html: string, owner: string, name: string): string {
+  const rawBase = `https://raw.githubusercontent.com/${owner}/${name}/HEAD/`;
+  const blobBase = `https://github.com/${owner}/${name}/blob/HEAD/`;
+  const repoPrefix = `${owner}/${name}/`;
+  const resolve = (base: string, p: string): string => {
+    if (/^(https?:)?\/\//.test(p) || p.startsWith("#") || p.startsWith("data:")) return p;
+    let rel = p.replace(/^\.\//, "");
+    if (rel.startsWith("/")) rel = rel.slice(1);
+    if (rel.startsWith(repoPrefix)) rel = rel.slice(repoPrefix.length);
+    return base + rel;
+  };
+  return html
+    .replace(/(src\s*=\s*")([^"]+)(")/g, (_m, pre: string, p: string, post: string) => pre + resolve(rawBase, p) + post)
+    .replace(/(href\s*=\s*")([^"]+)(")/g, (_m, pre: string, p: string, post: string) => pre + resolve(blobBase, p) + post)
+    .replace(/(srcset\s*=\s*")([^"]+)(")/g, (_m, pre: string, p: string, post: string) =>
+      pre +
+      p
+        .split(",")
+        .map((c) => {
+          const [u, d] = c.trim().split(/\s+/);
+          return resolve(rawBase, u) + (d ? " " + d : "");
+        })
+        .join(", ") +
+      post
+    );
+}
+
+/** Fetches the README as GitHub-rendered HTML (relative URLs absolutized). Null when absent. */
 export async function githubReadme(owner: string, name: string, token: string): Promise<string | null> {
   const res = await fetch(`${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/readme`, {
     headers: { ...HEADERS(token), Accept: "application/vnd.github.html" },
@@ -117,5 +145,5 @@ export async function githubReadme(owner: string, name: string, token: string): 
   if (!res.ok) {
     throw new Error(`GitHub ${res.status}: ${await res.text()}`);
   }
-  return res.text();
+  return absolutizeUrls(await res.text(), owner, name);
 }
