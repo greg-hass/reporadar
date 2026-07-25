@@ -6,6 +6,7 @@ import DensityToggle from "../components/DensityToggle";
 import SegmentedControl from "../components/SegmentedControl";
 import RepoListSkeleton from "../components/Skeleton";
 import StatsBand from "../components/StatsBand";
+import LoadMore from "../components/LoadMore";
 import { EmptyState, ErrorState } from "../components/States";
 import { useRisers } from "../hooks/useRisers";
 import { useDensity } from "../hooks/useDensity";
@@ -22,9 +23,9 @@ const WINDOW_DAYS: Record<Window, number> = { "1d": 1, "7d": 7, "30d": 30 };
 export default function RisersPage() {
   const [win, setWin] = useState<Window>("7d");
   const [density, setDensity] = useDensity();
-  const { data, isLoading, error, refetch } = useRisers(win, 1);
+  const { data, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = useRisers(win);
 
-  const items = data?.items ?? [];
+  const items = data?.pages.flatMap((p) => p.items) ?? [];
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
@@ -99,6 +100,12 @@ export default function RisersPage() {
               )
             )}
           </div>
+          <LoadMore
+            hasNextPage={hasNextPage ?? false}
+            isFetchingNextPage={isFetchingNextPage}
+            fetchNextPage={fetchNextPage}
+            loaded={items.length}
+          />
           <p className="hidden md:block text-[11px] text-muted text-right">
             <kbd className="border border-border rounded px-1">j</kbd>{" "}
             <kbd className="border border-border rounded px-1">k</kbd> navigate ·{" "}

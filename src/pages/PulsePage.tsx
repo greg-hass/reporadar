@@ -70,12 +70,13 @@ function HeroRiser({ repo }: { repo: Repo }) {
 }
 
 export default function PulsePage() {
-  const risers = useRisers("7d", 1);
+  const risers = useRisers("7d");
   const fresh = useSearch({ q: "stars:>1", createdSinceDays: 7, sort: "updated" }, true);
 
-  const hero = risers.data?.items[0];
-  const topRisers = risers.data?.items.slice(1, 6) ?? [];
-  const freshRepos = fresh.data?.items.slice(0, 6) ?? [];
+  const riserItems = risers.data?.pages[0]?.items ?? [];
+  const hero = riserItems[0];
+  const topRisers = riserItems.slice(1, 6);
+  const freshRepos = fresh.data?.pages[0]?.items.slice(0, 6) ?? [];
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">

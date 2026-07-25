@@ -103,7 +103,7 @@ export async function upsertAndSnapshot(repos: NormalizedRepo[], connStr: string
   }
 }
 
-export async function queryRisers(connStr: string, windowDays: number, limit: number): Promise<
+export async function queryRisers(connStr: string, windowDays: number, limit: number, offset = 0): Promise<
   (NormalizedRepo & { starDelta: number; history: number[] })[]
 > {
   const { Client } = await import("pg");
@@ -131,8 +131,8 @@ export async function queryRisers(connStr: string, windowDays: number, limit: nu
        JOIN repos r ON r.id = latest.repo_id
        LEFT JOIN past ON past.repo_id = latest.repo_id
        ORDER BY delta DESC
-       LIMIT $2`,
-      [String(windowDays), limit]
+       LIMIT $2 OFFSET $3`,
+      [String(windowDays), limit, offset]
     );
     const rows = res.rows as (NormalizedRepo & { delta: number })[];
     const ids = rows.map((r) => r.id);

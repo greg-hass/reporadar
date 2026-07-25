@@ -4,6 +4,7 @@ import RepoRow from "../components/RepoRow";
 import DensityToggle from "../components/DensityToggle";
 import SegmentedControl from "../components/SegmentedControl";
 import RepoListSkeleton from "../components/Skeleton";
+import LoadMore from "../components/LoadMore";
 import { EmptyState, ErrorState } from "../components/States";
 import { SparklesIcon } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
@@ -31,12 +32,12 @@ function ageBlock(repo: Repo) {
 export default function NewPage() {
   const [days, setDays] = useState<Days>("7");
   const [density, setDensity] = useDensity();
-  const { data, isLoading, error, refetch } = useSearch(
+  const { data, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = useSearch(
     { q: "stars:>1", createdSinceDays: Number(days), sort: "updated" },
     true
   );
 
-  const items = data?.items ?? [];
+  const items = data?.pages.flatMap((p) => p.items) ?? [];
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
@@ -88,6 +89,12 @@ export default function NewPage() {
               />
             ))}
           </div>
+          <LoadMore
+            hasNextPage={hasNextPage ?? false}
+            isFetchingNextPage={isFetchingNextPage}
+            fetchNextPage={fetchNextPage}
+            loaded={items.length}
+          />
           <p className="hidden md:block text-[11px] text-muted text-right">
             <kbd className="border border-border rounded px-1">j</kbd>{" "}
             <kbd className="border border-border rounded px-1">k</kbd> navigate ·{" "}

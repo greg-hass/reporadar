@@ -65,10 +65,10 @@ app.get("/api/risers", async (req, res) => {
   }
   const windowRaw = ONE(req.query.window) ?? "7d";
   const windowDays = windowRaw === "1d" ? 1 : windowRaw === "30d" ? 30 : 7;
-  // Pagination reserved for Phase 2; currently returns a single page of `limit`.
-  void req.query.page;
+  const page = Math.max(1, Number(ONE(req.query.page)) || 1);
+  const limit = 30;
   try {
-    const items = await queryRisers(connStr, windowDays, 30);
+    const items = await queryRisers(connStr, windowDays, limit, (page - 1) * limit);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : "risers failed" });

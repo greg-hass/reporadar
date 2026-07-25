@@ -1,12 +1,14 @@
 // CDP screenshot with proper mobile emulation (the --screenshot flag enforces a min window width).
-// Usage: node scripts/shoot.mjs <url> <outfile> [width] [height] [scale]
+// Usage: node scripts/shoot.mjs <url> <outfile> [width] [height] [scale] [scroll]
+//   scroll=1 → scroll to the bottom twice (triggers infinite scroll) before capturing.
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
-const [url, out, wArg, hArg, sArg] = process.argv.slice(2);
+const [url, out, wArg, hArg, sArg, scrollArg] = process.argv.slice(2);
 const width = Number(wArg || 390);
 const height = Number(hArg || 844);
 const scale = Number(sArg || 2);
+const scroll = scrollArg === "1";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 9224;
 
@@ -49,6 +51,12 @@ try {
   });
   await send("Page.navigate", { url });
   await sleep(3500);
+  if (scroll) {
+    for (let i = 0; i < 3; i++) {
+      await send("Runtime.evaluate", { expression: "window.scrollTo(0, document.body.scrollHeight)" });
+      await sleep(1500);
+    }
+  }
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(out, Buffer.from(shot.data, "base64"));
   console.log("saved", out);

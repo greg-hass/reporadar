@@ -43,15 +43,45 @@ app.get("/api/stats", (_req, res) => {
   res.json({ reposTracked: 1284, snapshotsToday: 24, starsGainedToday: 8412, lastSnapshotAt: ago(12) });
 });
 
-app.get("/api/risers", (_req, res) => {
-  const items = REPOS.map((r) => toRepo(r, true));
+const synth = (page, i) => ({
+  id: page * 1000 + i,
+  fullName: `acme/widget-${String(page * 30 + i + 1).padStart(3, "0")}`,
+  description: "Synthetic repo for pagination testing",
+  language: "TypeScript",
+  starsTotal: 4900 - page * 30 - i,
+  forks: 97,
+  starDelta: 300 - i * 7,
+  history: [4200, 4300, 4400, 4500, 4600, 4700, 4900 - i * 7],
+  topics: ["demo"],
+  createdAt: daysAgo(40),
+  license: "MIT",
+});
+
+app.get("/api/risers", (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const items =
+    page === 1
+      ? REPOS.map((r) => toRepo(r, true))
+      : page === 2
+        ? Array.from({ length: 30 }, (_, i) => toRepo(synth(page, i), true))
+        : [];
   res.json({ items, total: items.length });
 });
 
 app.get("/api/search", (req, res) => {
-  // "New" page flavour: recent createdAt; search flavour: anything.
-  const fresh = req.query.createdSinceDays ? REPOS.map((r, i) => ({ ...r, createdAt: ago(30 + i * 180) })) : REPOS;
-  res.json({ items: fresh.map((r) => toRepo(r, false)), total: 164380 });
+  const page = Math.max(1, Number(req.query.page) || 1);
+  // "New" page flavour: recent createdAt, single page.
+  if (req.query.createdSinceDays) {
+    const fresh = REPOS.map((r, i) => ({ ...r, createdAt: ago(30 + i * 180) }));
+    return res.json({ items: fresh.map((r) => toRepo(r, false)), total: 164380 });
+  }
+  const items =
+    page === 1
+      ? [...REPOS.map((r) => toRepo(r, false)), ...Array.from({ length: 22 }, (_, i) => toRepo(synth(page, i), false))]
+      : page <= 3
+        ? Array.from({ length: 30 }, (_, i) => toRepo(synth(page, i), false))
+        : [];
+  res.json({ items, total: 164380 });
 });
 
 app.get("/api/repos/:id/history", (req, res) => {

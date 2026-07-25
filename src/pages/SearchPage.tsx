@@ -5,6 +5,7 @@ import SortControl from "../components/SortControl";
 import DensityToggle from "../components/DensityToggle";
 import RepoRow from "../components/RepoRow";
 import RepoListSkeleton from "../components/Skeleton";
+import LoadMore from "../components/LoadMore";
 import { EmptyState, ErrorState } from "../components/States";
 import { Logo } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
@@ -33,12 +34,13 @@ export default function SearchPage() {
   const [density, setDensity] = useDensity();
 
   const enabled = q.length > 0;
-  const { data, isLoading, error, refetch } = useSearch(
+  const { data, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = useSearch(
     { q, language: language || undefined, minStars: minStars || undefined, createdSinceDays: createdSinceDays || undefined, sort },
     enabled
   );
 
-  const items = data?.items ?? [];
+  const items = data?.pages.flatMap((p) => p.items) ?? [];
+  const total = data?.pages[0]?.total;
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
@@ -93,7 +95,7 @@ export default function SearchPage() {
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="eyebrow !text-[10px]">
-              {isLoading ? "Searching…" : data ? `${data.total.toLocaleString()} results` : ""}
+              {isLoading ? "Searching…" : total !== undefined ? `${total.toLocaleString()} results` : ""}
             </span>
             <div className="flex gap-2 items-center ml-auto">
               <DensityToggle value={density} onChange={setDensity} />
@@ -121,6 +123,12 @@ export default function SearchPage() {
                   />
                 ))}
               </div>
+              <LoadMore
+                hasNextPage={hasNextPage ?? false}
+                isFetchingNextPage={isFetchingNextPage}
+                fetchNextPage={fetchNextPage}
+                loaded={items.length}
+              />
               <p className="hidden md:block text-[11px] text-muted text-right">
                 <kbd className="border border-border rounded px-1">j</kbd>{" "}
                 <kbd className="border border-border rounded px-1">k</kbd> navigate ·{" "}
