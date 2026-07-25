@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import type { Repo } from "../lib/types";
 import Sparkline from "./Sparkline";
 import LanguageDot from "./LanguageDot";
 import Rank from "./Rank";
+import FavButton from "./FavButton";
+import { ExternalLinkIcon } from "./icons";
 
 interface Props {
   repo: Repo;
@@ -17,6 +20,8 @@ interface Props {
 /** Leaderboard row for Fast Risers: identity + trajectory + velocity hero. */
 export default function RiserRow({ repo, rank, windowDays, window, selected, stagger }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const detailUrl = `/repo/${repo.fullName}`;
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -28,7 +33,8 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
   return (
     <div
       ref={ref}
-      className={`panel panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      onClick={() => navigate(detailUrl)}
+      className={`panel panel-row cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       <Rank n={rank} />
@@ -41,14 +47,27 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
       />
 
       <div className="flex-1 min-w-0">
-        <a
-          href={repo.htmlUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="font-semibold text-[15px] text-text hover:text-primary transition-colors truncate block"
-        >
-          {repo.fullName}
-        </a>
+        <span className="flex items-center gap-1.5 min-w-0">
+          <Link
+            to={detailUrl}
+            onClick={(e) => e.stopPropagation()}
+            className="font-semibold text-[15px] text-text hover:text-primary transition-colors truncate"
+          >
+            {repo.fullName}
+          </Link>
+          <FavButton repo={repo} size={13} />
+          <a
+            href={repo.htmlUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Open ${repo.fullName} on GitHub`}
+            title="Open on GitHub"
+            className="shrink-0 text-muted/50 hover:text-text transition-colors"
+          >
+            <ExternalLinkIcon size={13} />
+          </a>
+        </span>
         {repo.description && (
           <p className="hidden sm:block text-muted text-xs truncate mt-0.5">{repo.description}</p>
         )}

@@ -5,9 +5,9 @@ import RiserRow from "../components/RiserRow";
 import DensityToggle from "../components/DensityToggle";
 import SegmentedControl from "../components/SegmentedControl";
 import RepoListSkeleton from "../components/Skeleton";
-import StatsBand from "../components/StatsBand";
 import { EmptyState, ErrorState } from "../components/States";
-import { useRisers } from "../hooks/useRisers";
+import { StarIcon } from "../components/icons";
+import { useFavourites } from "../hooks/useFavourites";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 
@@ -19,13 +19,13 @@ const WINDOW_OPTIONS: { value: Window; label: string }[] = [
 ];
 const WINDOW_DAYS: Record<Window, number> = { "1d": 1, "7d": 7, "30d": 30 };
 
-export default function RisersPage() {
+export default function FavouritesPage() {
   const [win, setWin] = useState<Window>("7d");
   const [density, setDensity] = useDensity();
-  const { data, isLoading, error, refetch } = useRisers(win, 1);
+  const navigate = useNavigate();
+  const { data, isLoading, error, refetch } = useFavourites(win);
 
   const items = data?.items ?? [];
-  const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
     onExternal: (i) => window.open(items[i].htmlUrl, "_blank", "noreferrer"),
@@ -38,15 +38,16 @@ export default function RisersPage() {
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
-      <div className="radar-bg" aria-hidden="true" />
-
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0">
-          <div className="eyebrow">Signal monitor · last {win}</div>
-          <h1 className="text-2xl font-extrabold tracking-tight mt-1">Fast Risers</h1>
-          <p className="text-xs text-muted mt-1">
-            Most stars gained, computed from our hourly snapshots
-          </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 text-primary shrink-0">
+            <StarIcon size={19} />
+          </div>
+          <div>
+            <div className="eyebrow !text-[9px]">Pinned signals</div>
+            <h1 className="text-lg font-bold leading-tight mt-0.5">Favourites</h1>
+            <p className="text-xs text-muted">Your repos, snapshotted hourly by the tracking job</p>
+          </div>
         </div>
         <div className="flex gap-2 items-center ml-auto">
           <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
@@ -54,16 +55,15 @@ export default function RisersPage() {
         </div>
       </div>
 
-      <StatsBand />
-
       {isLoading ? (
         <RepoListSkeleton />
       ) : error ? (
         <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No risers yet"
-          hint="Risers appear after the hourly snapshot job has run at least twice."
+          icon={StarIcon}
+          title="No favourites yet"
+          hint="Star any repo to pin it here — favourited repos get snapshotted hourly, so their velocity charts fill in automatically."
         />
       ) : (
         <>
@@ -78,12 +78,14 @@ export default function RisersPage() {
                   compact
                   stagger={i}
                   right={
-                    <div className="text-right shrink-0">
-                      <div className="font-mono tabular-nums text-sm font-bold text-success">
-                        +{(repo.starDelta ?? 0).toLocaleString()}
+                    repo.starDelta != null ? (
+                      <div className="text-right shrink-0">
+                        <div className="font-mono tabular-nums text-sm font-bold text-success">
+                          +{repo.starDelta.toLocaleString()}
+                        </div>
+                        <div className="text-[9px] uppercase tracking-wider text-muted">· {win}</div>
                       </div>
-                      <div className="text-[9px] uppercase tracking-wider text-muted">· {win}</div>
-                    </div>
+                    ) : undefined
                   }
                 />
               ) : (

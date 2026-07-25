@@ -6,6 +6,8 @@ import PulsePage from "./pages/PulsePage";
 import SearchPage from "./pages/SearchPage";
 import NewPage from "./pages/NewPage";
 import RisersPage from "./pages/RisersPage";
+import FavouritesPage from "./pages/FavouritesPage";
+import RepoDetailPage from "./pages/RepoDetailPage";
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
               <Route path="/search" element={<SearchPage />} />
               <Route path="/new" element={<NewPage />} />
               <Route path="/risers" element={<RisersPage />} />
+              <Route path="/favourites" element={<FavouritesPage />} />
+              <Route path="/repo/:owner/:name" element={<RepoDetailPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

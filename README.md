@@ -42,7 +42,10 @@ Or make the package public (GitHub → Packages → reporadar → Package settin
 - **Search** (`/search`) — keyword + filters (language, min stars, created-since), sorted by stars/date/relevance. Live GitHub Search API.
 - **New** — repos created in the last 1/7/30 days.
 - **Fast Risers** — repos gaining the most stars over 1d/7d/30d, with velocity-per-day figures and inline sparklines. Computed from the hourly snapshots.
+- **Repo detail** (`/repo/:owner/:name`) — in-app page with metadata and an interactive star-history chart (7/30/90 days); tracked repos from the DB, anything else live from the GitHub API.
+- **Favourites** — star any repo to pin it; favourited repos are refreshed and snapshotted by the hourly job, so their velocity charts fill in automatically.
 - **Themes** — Aurora (default) / GitHub Dark / Tokyo Night / Light, toggleable in the sidebar.
+- **PWA** — installable on iPhone/iPad/Android home screens (standalone, full-screen, themed icon).
 
 Every list supports keyboard navigation: `j` / `k` to move, `↵` to open, `/` to jump to search.
 

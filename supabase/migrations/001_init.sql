@@ -27,3 +27,9 @@ CREATE TABLE IF NOT EXISTS star_snapshots (
 CREATE INDEX IF NOT EXISTS idx_star_snap_repo_time ON star_snapshots (repo_id, captured_at DESC);
 CREATE INDEX IF NOT EXISTS idx_star_snap_captured ON star_snapshots (captured_at);
 CREATE INDEX IF NOT EXISTS idx_repos_language ON repos (language);
+
+CREATE TABLE IF NOT EXISTS favourites (
+  repo_id   bigint PRIMARY KEY,
+  payload   jsonb NOT NULL,
+  added_at  timestamptz NOT NULL DEFAULT now()
+);

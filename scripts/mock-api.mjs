@@ -56,7 +56,38 @@ app.get("/api/search", (req, res) => {
 
 app.get("/api/repos/:id/history", (req, res) => {
   const r = REPOS.find((x) => x.id === Number(req.params.id));
-  res.json({ points: r ? r.history : [] });
+  if (!r) return res.json({ points: [] });
+  const days = req.query.days ? Number(req.query.days) : 30;
+  const n = Math.min(Math.max(2, days), 30);
+  const lo = Math.min(...r.history);
+  const hi = Math.max(...r.history);
+  const points = Array.from({ length: n }, (_, i) => ({
+    t: new Date(Date.now() - (n - 1 - i) * 86_400_000).toISOString(),
+    stars: Math.round(lo + ((hi - lo) * i) / (n - 1)),
+  }));
+  res.json({ points });
+});
+
+app.get("/api/repo/:owner/:name", (req, res) => {
+  const r = REPOS.find((x) => x.fullName === `${req.params.owner}/${req.params.name}`);
+  if (!r) return res.status(404).json({ error: "not found" });
+  res.json(toRepo(r, false));
+});
+
+const favs = new Map();
+app.get("/api/favourites", (_req, res) => {
+  const items = [...favs.values()].map((r) => toRepo(r, true));
+  res.json({ items, total: items.length });
+});
+app.get("/api/favourites/ids", (_req, res) => res.json({ ids: [...favs.keys()] }));
+app.use(express.json());
+app.put("/api/favourites/:id", (req, res) => {
+  favs.set(req.body.id, REPOS.find((x) => x.id === req.body.id) ?? req.body);
+  res.json({ ok: true });
+});
+app.delete("/api/favourites/:id", (req, res) => {
+  favs.delete(Number(req.params.id));
+  res.json({ ok: true });
 });
 
 app.listen(4600, () => console.log("mock api on :4600"));

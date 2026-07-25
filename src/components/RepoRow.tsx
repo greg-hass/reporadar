@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import type { Repo } from "../lib/types";
 import { compactNumber } from "../lib/format";
-import { ForkIcon, StarIcon } from "./icons";
+import { ExternalLinkIcon, ForkIcon, StarIcon } from "./icons";
 import LanguageDot from "./LanguageDot";
 import Rank from "./Rank";
+import FavButton from "./FavButton";
 
 interface Props {
   repo: Repo;
@@ -19,9 +21,13 @@ interface Props {
 
 /** The one row used by every list in the app — a standalone panel card. */
 export default function RepoRow({ repo, rank, selected, compact, stagger = 0, right }: Props) {
+  const navigate = useNavigate();
+  const detailUrl = `/repo/${repo.fullName}`;
+
   return (
     <div
-      className={`panel panel-row ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      onClick={() => navigate(detailUrl)}
+      className={`panel panel-row cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       {rank !== undefined && <Rank n={rank} />}
@@ -32,14 +38,27 @@ export default function RepoRow({ repo, rank, selected, compact, stagger = 0, ri
         loading="lazy"
       />
       <div className="flex-1 min-w-0">
-        <a
-          href={repo.htmlUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="font-semibold text-[15px] text-text hover:text-primary transition-colors truncate block"
-        >
-          {repo.fullName}
-        </a>
+        <span className="flex items-center gap-1.5 min-w-0">
+          <Link
+            to={detailUrl}
+            onClick={(e) => e.stopPropagation()}
+            className="font-semibold text-[15px] text-text hover:text-primary transition-colors truncate"
+          >
+            {repo.fullName}
+          </Link>
+          <FavButton repo={repo} size={13} />
+          <a
+            href={repo.htmlUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Open ${repo.fullName} on GitHub`}
+            title="Open on GitHub"
+            className="shrink-0 text-muted/50 hover:text-text transition-colors"
+          >
+            <ExternalLinkIcon size={13} />
+          </a>
+        </span>
         {!compact && repo.description && (
           <p className="hidden sm:block text-muted text-xs truncate mt-0.5">{repo.description}</p>
         )}

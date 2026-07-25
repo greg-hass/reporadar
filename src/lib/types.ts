@@ -26,6 +26,11 @@ export interface Stats {
   lastSnapshotAt: string | null; // ISO
 }
 
+export interface HistoryPoint {
+  t: string; // ISO
+  stars: number;
+}
+
 export interface SearchParams {
   q: string;
   language?: string;

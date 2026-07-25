@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS star_snapshots (
 CREATE INDEX IF NOT EXISTS idx_star_snap_repo_time ON star_snapshots (repo_id, captured_at DESC);
 CREATE INDEX IF NOT EXISTS idx_star_snap_captured ON star_snapshots (captured_at);
 CREATE INDEX IF NOT EXISTS idx_repos_language ON repos (language);
+
+CREATE TABLE IF NOT EXISTS favourites (
+  repo_id   bigint PRIMARY KEY,
+  payload   jsonb NOT NULL,
+  added_at  timestamptz NOT NULL DEFAULT now()
+);
 `;
 
 /** Creates the schema if missing. Safe to call on every boot. */
@@ -182,18 +188,139 @@ export async function queryStats(connStr: string): Promise<RepoStats> {
   }
 }
 
-/** Reads a star-history sparkline for one repo. */
-export async function queryHistory(connStr: string, repoId: number, days: number): Promise<number[]> {  const { Client } = await import("pg");
+/** Reads timestamped star history for one repo (chart tooltips). */
+export interface HistoryPoint {
+  t: string; // ISO
+  stars: number;
+}
+
+export async function queryHistory(connStr: string, repoId: number, days: number): Promise<HistoryPoint[]> {
+  const { Client } = await import("pg");
   const client = new Client(parseConn(connStr));
   await client.connect();
   try {
     const res = await client.query(
-      `SELECT stars FROM star_snapshots
+      `SELECT captured_at AS t, stars FROM star_snapshots
        WHERE repo_id = $1 AND captured_at >= now() - ($2 || ' days')::interval
        ORDER BY captured_at`,
       [repoId, String(days)]
     );
-    return res.rows.map((r) => r.stars as number);
+    return res.rows.map((r) => ({ t: new Date(r.t).toISOString(), stars: r.stars as number }));
+  } finally {
+    await client.end();
+  }
+}
+
+/** Single repo by full_name, or null when not tracked. */
+export async function queryRepoByName(connStr: string, fullName: string): Promise<NormalizedRepo | null> {
+  const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    const res = await client.query(
+      `SELECT id, full_name AS "fullName", description, language, topics,
+              stars_total AS "starsTotal", forks, created_at AS "createdAt",
+              pushed_at AS "pushedAt", license, owner_avatar AS "ownerAvatar", html_url AS "htmlUrl"
+       FROM repos WHERE full_name = $1`,
+      [fullName]
+    );
+    return (res.rows[0] as NormalizedRepo | undefined) ?? null;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function listFavouriteIds(connStr: string): Promise<number[]> {
+  const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    const res = await client.query(`SELECT repo_id FROM favourites`);
+    return res.rows.map((r) => r.repo_id as number);
+  } finally {
+    await client.end();
+  }
+}
+
+export async function addFavourite(connStr: string, repo: NormalizedRepo): Promise<void> {
+  const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    await client.query(
+      `INSERT INTO favourites (repo_id, payload) VALUES ($1, $2) ON CONFLICT (repo_id) DO NOTHING`,
+      [repo.id, JSON.stringify(repo)]
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+export async function removeFavourite(connStr: string, repoId: number): Promise<void> {
+  const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    await client.query(`DELETE FROM favourites WHERE repo_id = $1`, [repoId]);
+  } finally {
+    await client.end();
+  }
+}
+
+/** Favourites with riser-style velocity; falls back to the stored payload when not yet snapshotted. */
+export async function queryFavourites(
+  connStr: string,
+  windowDays: number
+): Promise<(NormalizedRepo & { starDelta: number | null; history: number[] })[]> {
+  const { Client } = await import("pg");
+  const client = new Client(parseConn(connStr));
+  await client.connect();
+  try {
+    const res = await client.query(
+      `WITH latest AS (
+         SELECT repo_id, stars FROM star_snapshots
+         WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)
+       ),
+       past AS (
+         SELECT DISTINCT ON (repo_id) repo_id, stars AS past_stars
+         FROM star_snapshots
+         WHERE captured_at >= now() - ($1 || ' days')::interval
+         ORDER BY repo_id, captured_at ASC
+       )
+       SELECT f.repo_id AS id,
+              COALESCE(r.full_name, f.payload->>'fullName') AS "fullName",
+              COALESCE(r.description, f.payload->>'description') AS description,
+              COALESCE(r.language, f.payload->>'language') AS language,
+              COALESCE(r.topics, ARRAY(SELECT jsonb_array_elements_text(f.payload->'topics'))) AS topics,
+              COALESCE(r.stars_total, (f.payload->>'starsTotal')::int) AS "starsTotal",
+              COALESCE(r.forks, (f.payload->>'forks')::int) AS forks,
+              COALESCE(r.created_at, (f.payload->>'createdAt')::timestamptz) AS "createdAt",
+              COALESCE(r.pushed_at, (f.payload->>'pushedAt')::timestamptz) AS "pushedAt",
+              COALESCE(r.license, f.payload->>'license') AS license,
+              COALESCE(r.owner_avatar, f.payload->>'ownerAvatar') AS "ownerAvatar",
+              COALESCE(r.html_url, f.payload->>'htmlUrl') AS "htmlUrl",
+              (latest.stars - COALESCE(past.past_stars, latest.stars)) AS delta
+       FROM favourites f
+       LEFT JOIN repos r ON r.id = f.repo_id
+       LEFT JOIN latest ON latest.repo_id = f.repo_id
+       LEFT JOIN past ON past.repo_id = f.repo_id
+       ORDER BY f.added_at DESC`,
+      [String(windowDays)]
+    );
+    const rows = res.rows as (NormalizedRepo & { delta: number | null })[];
+    const ids = rows.map((r) => r.id);
+    const historyMap: Record<number, number[]> = {};
+    if (ids.length) {
+      const hist = await client.query(
+        `SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
+         FROM star_snapshots
+         WHERE repo_id = ANY($1::bigint[]) AND captured_at >= now() - '7 days'::interval
+         GROUP BY repo_id`,
+        [ids]
+      );
+      for (const h of hist.rows) historyMap[h.repo_id as number] = h.pts as number[];
+    }
+    return rows.map((r) => ({ ...r, starDelta: r.delta ?? null, history: historyMap[r.id] ?? [] }));
   } finally {
     await client.end();
   }

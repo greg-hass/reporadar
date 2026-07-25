@@ -1,5 +1,11 @@
 const GITHUB_API = "https://api.github.com";
 
+const HEADERS = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+});
+
 interface GhRepo {
   id: number;
   full_name: string;
@@ -74,16 +80,30 @@ export async function githubSearch(
   const page = query.page ? `&page=${query.page}` : "";
   const url = `${GITHUB_API}/search/repositories?q=${q}&per_page=30${sort}${page}`;
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
+  const res = await fetch(url, { headers: HEADERS(token) });
   if (!res.ok) {
     throw new Error(`GitHub ${res.status}: ${await res.text()}`);
   }
   const json = (await res.json()) as { total_count: number; items: GhRepo[] };
   return { items: json.items.map(normalize), total: json.total_count };
+}
+
+/** Fetches a single repo by owner/name. */
+export async function githubRepo(owner: string, name: string, token: string): Promise<NormalizedRepo> {
+  const res = await fetch(`${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`, {
+    headers: HEADERS(token),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  }
+  return normalize((await res.json()) as GhRepo);
+}
+
+/** Fetches a single repo by its numeric GitHub id (used to refresh favourites). */
+export async function githubRepoById(id: number, token: string): Promise<NormalizedRepo> {
+  const res = await fetch(`${GITHUB_API}/repositories/${id}`, { headers: HEADERS(token) });
+  if (!res.ok) {
+    throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  }
+  return normalize((await res.json()) as GhRepo);
 }

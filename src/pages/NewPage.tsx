@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import RepoRow from "../components/RepoRow";
 import DensityToggle from "../components/DensityToggle";
 import SegmentedControl from "../components/SegmentedControl";
@@ -36,8 +37,10 @@ export default function NewPage() {
   );
 
   const items = data?.items ?? [];
-  const { sel, reset } = useRovingKeys(items.length, (i) => {
-    window.open(items[i].htmlUrl, "_blank", "noreferrer");
+  const navigate = useNavigate();
+  const { sel, reset } = useRovingKeys(items.length, {
+    onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
+    onExternal: (i) => window.open(items[i].htmlUrl, "_blank", "noreferrer"),
   });
 
   const changeDays = (d: Days) => {
@@ -88,7 +91,8 @@ export default function NewPage() {
           <p className="hidden md:block text-[11px] text-muted text-right">
             <kbd className="border border-border rounded px-1">j</kbd>{" "}
             <kbd className="border border-border rounded px-1">k</kbd> navigate ·{" "}
-            <kbd className="border border-border rounded px-1">↵</kbd> open
+            <kbd className="border border-border rounded px-1">↵</kbd> details ·{" "}
+            <kbd className="border border-border rounded px-1">o</kbd> github
           </p>
         </>
       )}
