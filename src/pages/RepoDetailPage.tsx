@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import DOMPurify from "dompurify";
 import HistoryChart from "../components/HistoryChart";
 import SegmentedControl from "../components/SegmentedControl";
 import LanguageDot from "../components/LanguageDot";
@@ -7,6 +8,7 @@ import { ErrorState } from "../components/States";
 import { ExternalLinkIcon, ForkIcon, StarIcon } from "../components/icons";
 import { useRepo } from "../hooks/useRepo";
 import { useHistory } from "../hooks/useHistory";
+import { useReadme } from "../hooks/useReadme";
 import { useFavouriteIds, useToggleFavourite } from "../hooks/useFavourites";
 import { compactNumber } from "../lib/format";
 
@@ -23,12 +25,24 @@ export default function RepoDetailPage() {
   const [days, setDays] = useState<Days>("30");
   const { data: repo, isLoading, error, refetch } = useRepo(owner, name);
   const history = useHistory(repo?.id, Number(days));
+  const readme = useReadme(owner, name);
   const { data: favIds } = useFavouriteIds();
   const toggle = useToggleFavourite();
+  const [readmeExpanded, setReadmeExpanded] = useState(false);
 
   const points = history.data?.points ?? [];
   const tracked = points.length > 1;
   const isFav = repo ? (favIds?.ids.includes(repo.id) ?? false) : false;
+  const readmeHtml = readme.data?.html ?? null;
+  const readmeLong = readmeHtml !== null && readmeHtml.length > 4000;
+
+  // How much real data the selected window actually covers.
+  const spanDays = tracked
+    ? (new Date(points[points.length - 1].t).getTime() - new Date(points[0].t).getTime()) / 86_400_000
+    : 0;
+  const windowLimited = tracked && spanDays + 0.5 < Number(days);
+  const fmtDay = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
@@ -132,7 +146,21 @@ export default function RepoDetailPage() {
               {history.isLoading ? (
                 <div className="skeleton h-44 w-full" />
               ) : tracked ? (
-                <HistoryChart points={points} />
+                <>
+                  <HistoryChart points={points} />
+                  <div className="flex items-center justify-between mt-2 font-mono tabular-nums text-[10px] text-muted">
+                    <span>{fmtDay(points[0].t)}</span>
+                    <span>{points.length} snapshots</span>
+                    <span>{fmtDay(points[points.length - 1].t)}</span>
+                  </div>
+                  {windowLimited && (
+                    <p className="text-[11px] text-muted mt-2">
+                      Tracking only started {fmtDay(points[0].t)} — the {days}-day window currently
+                      covers {Math.max(1, Math.round(spanDays))} day{Math.round(spanDays) === 1 ? "" : "s"} of data.
+                      The chart fills in as snapshots accumulate.
+                    </p>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center text-center py-10">
                   <p className="text-muted text-sm max-w-sm">
@@ -151,6 +179,39 @@ export default function RepoDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+          <div className="panel p-5 sm:p-6 animate-fade-up">
+            <span className="eyebrow !text-[9px]">About</span>
+            {readme.isLoading ? (
+              <div className="mt-3 flex flex-col gap-2.5">
+                <div className="skeleton h-3.5 w-3/4" />
+                <div className="skeleton h-3 w-full" />
+                <div className="skeleton h-3 w-full" />
+                <div className="skeleton h-3 w-2/3" />
+              </div>
+            ) : readmeHtml ? (
+              <>
+                <div
+                  className={`readme mt-3 ${readmeLong && !readmeExpanded ? "max-h-[420px] overflow-hidden" : ""}`}
+                  style={
+                    readmeLong && !readmeExpanded
+                      ? { maskImage: "linear-gradient(to bottom, black 75%, transparent)", WebkitMaskImage: "linear-gradient(to bottom, black 75%, transparent)" }
+                      : undefined
+                  }
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(readmeHtml) }}
+                />
+                {readmeLong && (
+                  <button
+                    onClick={() => setReadmeExpanded((v) => !v)}
+                    className="text-xs text-primary hover:underline mt-2"
+                  >
+                    {readmeExpanded ? "Show less" : "Read more"}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-muted text-sm mt-3">No README available for this repository.</p>
+            )}
           </div>
         </>
       )}

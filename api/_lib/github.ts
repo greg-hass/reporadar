@@ -107,3 +107,15 @@ export async function githubRepoById(id: number, token: string): Promise<Normali
   }
   return normalize((await res.json()) as GhRepo);
 }
+
+/** Fetches the README as GitHub-rendered HTML (relative links already resolved). Null when absent. */
+export async function githubReadme(owner: string, name: string, token: string): Promise<string | null> {
+  const res = await fetch(`${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/readme`, {
+    headers: { ...HEADERS(token), Accept: "application/vnd.github.html" },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  }
+  return res.text();
+}

@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import cron from "node-cron";
-import { githubSearch, githubRepo, githubRepoById, type NormalizedRepo, type SearchQuery } from "../api/_lib/github";
+import { githubSearch, githubRepo, githubRepoById, githubReadme, type NormalizedRepo, type SearchQuery } from "../api/_lib/github";
 import {
   upsertAndSnapshot,
   queryRisers,
@@ -131,6 +131,20 @@ app.get("/api/repo/:owner/:name", async (req, res) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "repo lookup failed";
     res.status(msg.startsWith("GitHub 404") ? 404 : 500).json({ error: msg });
+  }
+});
+
+// GET /api/repo/:owner/:name/readme — GitHub-rendered README HTML (sanitized client-side).
+app.get("/api/repo/:owner/:name/readme", async (req, res) => {
+  const token = process.env.GITHUB_SERVER_TOKEN ?? "";
+  if (!token) {
+    res.status(500).json({ error: "GITHUB_SERVER_TOKEN not set" });
+    return;
+  }
+  try {
+    res.json({ html: await githubReadme(req.params.owner, req.params.name, token) });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "readme failed" });
   }
 });
 

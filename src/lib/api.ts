@@ -53,6 +53,10 @@ export async function fetchRepo(owner: string, name: string): Promise<Repo> {
   return getJson(`/repo/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`);
 }
 
+export async function fetchReadme(owner: string, name: string): Promise<{ html: string | null }> {
+  return getJson(`/repo/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/readme`);
+}
+
 export async function fetchFavourites(window: "1d" | "7d" | "30d"): Promise<{ items: Repo[]; total: number }> {
   return getJson(`/favourites${toQuery({ window })}`);
 }
