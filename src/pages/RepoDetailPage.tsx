@@ -6,6 +6,7 @@ import SegmentedControl from "../components/SegmentedControl";
 import LanguageDot from "../components/LanguageDot";
 import { ErrorState } from "../components/States";
 import { ExternalLinkIcon, ForkIcon, StarIcon } from "../components/icons";
+import InstallCommands from "../components/InstallCommands";
 import { useRepo } from "../hooks/useRepo";
 import { useHistory } from "../hooks/useHistory";
 import { useReadme } from "../hooks/useReadme";
@@ -191,6 +192,7 @@ export default function RepoDetailPage() {
               </div>
             ) : readmeHtml ? (
               <>
+                <InstallCommands html={DOMPurify.sanitize(readmeHtml)} />
                 <div
                   className={`readme mt-3 ${readmeLong && !readmeExpanded ? "max-h-[420px] overflow-hidden" : ""}`}
                   style={

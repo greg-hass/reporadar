@@ -91,6 +91,15 @@ export const InboxIcon = make(
   </>
 );
 
+export const CopyIcon = make(
+  <>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </>
+);
+
+export const CheckIcon = make(<path d="M20 6 9 17l-5-5" />);
+
 export function Logo({ size = 26 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
