@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import HistoryChart from "../components/HistoryChart";
@@ -30,12 +30,53 @@ export default function RepoDetailPage() {
   const { data: favIds } = useFavouriteIds();
   const toggle = useToggleFavourite();
   const [readmeExpanded, setReadmeExpanded] = useState(false);
+  const readmeRef = useRef<HTMLDivElement>(null);
 
   const points = history.data?.points ?? [];
   const tracked = points.length > 1;
   const isFav = repo ? (favIds?.ids.includes(repo.id) ?? false) : false;
   const readmeHtml = readme.data?.html ?? null;
   const readmeLong = readmeHtml !== null && readmeHtml.length > 4000;
+
+  // GitHub-style hover-to-copy buttons on every README code block.
+  // The README is injected via dangerouslySetInnerHTML, so buttons are
+  // attached imperatively once the HTML lands.
+  useEffect(() => {
+    const root = readmeRef.current;
+    if (!root) return;
+    const COPY_SVG =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    const CHECK_SVG =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    root.querySelectorAll("pre").forEach((pre) => {
+      if (pre.querySelector(".readme-copy")) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "readme-copy";
+      btn.title = "Copy";
+      btn.setAttribute("aria-label", "Copy code block");
+      btn.innerHTML = COPY_SVG;
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(pre.textContent ?? "");
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = pre.textContent ?? "";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+        btn.innerHTML = CHECK_SVG;
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = COPY_SVG;
+          btn.classList.remove("copied");
+        }, 1600);
+      });
+      pre.appendChild(btn);
+    });
+  }, [readmeHtml]);
 
   // How much real data the selected window actually covers.
   const spanDays = tracked
@@ -49,7 +90,7 @@ export default function RepoDetailPage() {
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
       <button
         onClick={() => navigate(-1)}
-        className="self-start text-xs text-muted hover:text-text transition-colors"
+        className="sticky top-3 z-30 self-start rounded-full bg-surface/80 backdrop-blur px-3.5 py-1.5 text-xs text-muted hover:text-text transition-colors"
       >
         ← Back
       </button>
@@ -127,7 +168,7 @@ export default function RepoDetailPage() {
                 {repo.topics.slice(0, 8).map((t) => (
                   <span
                     key={t}
-                    className="text-[10px] px-2 py-0.5 rounded-full bg-elevated border border-border/60 text-muted"
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-elevated text-muted"
                   >
                     {t}
                   </span>
@@ -194,6 +235,7 @@ export default function RepoDetailPage() {
               <>
                 <InstallCommands html={DOMPurify.sanitize(readmeHtml)} />
                 <div
+                  ref={readmeRef}
                   className={`readme mt-3 ${readmeLong && !readmeExpanded ? "max-h-[420px] overflow-hidden" : ""}`}
                   style={
                     readmeLong && !readmeExpanded
