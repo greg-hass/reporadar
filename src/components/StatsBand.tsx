@@ -39,8 +39,8 @@ export default function StatsBand() {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {cell("Repos tracked", data.reposTracked.toLocaleString())}
-      {cell("Snapshots today", data.snapshotsToday.toLocaleString())}
+      {cell("Repos tracked", <span className="gradient-text">{data.reposTracked.toLocaleString()}</span>)}
+      {cell("Snapshots today", <span className="gradient-text">{data.snapshotsToday.toLocaleString()}</span>)}
       {cell(
         "Stars gained today",
         <span className="text-success">+{compactNumber(data.starsGainedToday)}</span>

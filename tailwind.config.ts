@@ -26,6 +26,13 @@ export default {
           "Roboto",
           "sans-serif",
         ],
+        display: [
+          '"Space Grotesk Variable"',
+          '"Inter Variable"',
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
       },
       boxShadow: {
         card: "0 1px 2px rgb(0 0 0 / 0.18), 0 12px 32px -16px rgb(0 0 0 / 0.4)",

@@ -1,18 +1,20 @@
 import { Link } from "react-router-dom";
 import Sparkline from "./Sparkline";
 import LanguageDot from "./LanguageDot";
+import { useCountUp } from "../hooks/useCountUp";
 import type { Repo } from "../lib/types";
 
 /** Spotlight panel for the #1 riser at the top of the Trending homepage. */
 export default function HeroRiser({ repo, windowDays }: { repo: Repo; windowDays: number }) {
   const delta = repo.starDelta ?? 0;
-  const perDay = Math.round(delta / windowDays);
+  const perDay = useCountUp(Math.round(delta / windowDays));
   const history = repo.history ?? null;
   return (
     <Link
       to={`/repo/${repo.fullName}`}
-      className="panel block p-5 sm:p-6 hover:border-primary/40 animate-fade-up"
+      className="panel hero-glow block p-5 sm:p-6 animate-fade-up transition-transform duration-200 hover:-translate-y-0.5"
     >
+      <div className="hero-radar" aria-hidden="true" />
       <div className="flex items-center justify-between gap-3">
         <span className="eyebrow !text-[9px] gradient-text">#1 riser · last {windowDays}d</span>
         <span className="flex items-center text-[11px] text-muted">
@@ -31,7 +33,7 @@ export default function HeroRiser({ repo, windowDays }: { repo: Repo; windowDays
       </div>
       <div className="flex items-end justify-between gap-4 mt-5">
         <div>
-          <div className="gradient-text font-mono tabular-nums text-4xl font-extrabold leading-none">
+          <div className="gradient-text hero-number font-display tabular-nums text-6xl font-extrabold leading-none tracking-tight">
             +{perDay.toLocaleString()}
           </div>
           <div className="text-[10px] uppercase tracking-wider text-muted mt-1.5">

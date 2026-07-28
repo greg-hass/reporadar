@@ -117,7 +117,7 @@ export default function RepoDetailPage() {
             <div className="flex flex-wrap items-start gap-4">
               <img src={repo.ownerAvatar} alt="" className="w-14 h-14 rounded-xl ring-1 ring-border" />
               <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-extrabold tracking-tight break-all">{repo.fullName}</h1>
+                <h1 className="font-display text-xl font-extrabold tracking-tight break-all">{repo.fullName}</h1>
                 {repo.description && (
                   <p className="text-muted text-sm mt-1 leading-relaxed">{repo.description}</p>
                 )}

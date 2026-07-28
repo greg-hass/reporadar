@@ -49,7 +49,7 @@ export default function RisersPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-0">
           <div className="eyebrow">Signal monitor · last {win}</div>
-          <h1 className="text-2xl font-extrabold tracking-tight mt-1">Trending</h1>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight mt-1">Trending</h1>
           <p className="text-xs text-muted mt-1">
             Most stars gained, computed from our hourly snapshots
           </p>

@@ -69,8 +69,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 40rem at 85% -10%, color-mix(in srgb, var(--color-primary) 13%, transparent), transparent 60%),
-    radial-gradient(50rem 36rem at -10% 110%, color-mix(in srgb, var(--color-accent) 9%, transparent), transparent 60%);
+    radial-gradient(60rem 40rem at 85% -10%, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 110%, color-mix(in srgb, var(--color-accent) 13%, transparent), transparent 60%);
 }
 
 ::selection {
@@ -101,12 +101,14 @@ body::before {
 }
 
 @layer components {
-  /* Elevated surface used by repo cards and panels. */
+  /* Elevated surface used by repo cards and panels. Depth, not outlines. */
   .card {
     background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
     border-radius: 14px;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.04),
+      0 10px 28px -14px rgb(0 0 0 / 0.5);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
   }
 
   /* Shared text-input styling. */
@@ -206,11 +208,17 @@ body::before {
   /* Glassy stats-band panel with a hairline top glow. */
   .stat-panel {
     position: relative;
-    background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
-    border: 1px solid var(--color-border);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface) 92%, transparent),
+      color-mix(in srgb, var(--color-surface) 65%, transparent)
+    );
     border-radius: 12px;
     padding: 14px 16px;
     overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.04),
+      0 10px 26px -16px rgb(0 0 0 / 0.55);
   }
   .stat-panel::before {
     content: "";
@@ -258,12 +266,18 @@ body::before {
     animation: radar-sweep 9s linear infinite;
   }
 
-  /* Leaderboard panel: one bordered surface holding hairline-divided rows. */
+  /* Leaderboard panel: floating surface, depth via shadow instead of outline. */
   .panel {
-    background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);
-    border: 1px solid var(--color-border);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface) 88%, transparent),
+      color-mix(in srgb, var(--color-surface) 62%, transparent)
+    );
     border-radius: 16px;
     overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.04),
+      0 12px 30px -16px rgb(0 0 0 / 0.6);
   }
 
   /* A leaderboard row; each row is its own .panel card in a gap-spaced stack. */
@@ -272,7 +286,7 @@ body::before {
     align-items: center;
     gap: 12px;
     padding: 14px 16px;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.2s ease;
   }
   @media (min-width: 640px) {
     .panel-row {
@@ -282,8 +296,12 @@ body::before {
     }
   }
   .panel-row:hover {
-    background-color: color-mix(in srgb, var(--color-elevated) 45%, transparent);
-    border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+    background-color: color-mix(in srgb, var(--color-elevated) 55%, transparent);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.05),
+      0 16px 34px -16px rgb(0 0 0 / 0.65),
+      0 0 24px -12px color-mix(in srgb, var(--color-primary) 55%, transparent);
   }
   .panel-row-selected,
   .panel-row-selected:hover {
@@ -297,6 +315,91 @@ body::before {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /* Spotlight panel: gradient ring + inner ambient glow (the "wow" moment). */
+  .hero-glow {
+    position: relative;
+  }
+  .hero-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 75%, transparent),
+      transparent 35%,
+      transparent 65%,
+      color-mix(in srgb, var(--color-accent) 75%, transparent)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .hero-glow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    pointer-events: none;
+    background: radial-gradient(
+      34rem 14rem at 18% -25%,
+      color-mix(in srgb, var(--color-primary) 16%, transparent),
+      transparent 60%
+    );
+  }
+  /* Glow behind big gradient numbers. */
+  .hero-number {
+    filter: drop-shadow(0 0 22px color-mix(in srgb, var(--color-primary) 45%, transparent));
+  }
+
+  /* Radar dish inside the hero panel: rings + rotating sweep + blip. */
+  .hero-radar {
+    position: absolute;
+    top: 50%;
+    right: -9%;
+    width: 320px;
+    height: 320px;
+    transform: translateY(-50%);
+    border-radius: 9999px;
+    pointer-events: none;
+    opacity: 0.8;
+    background: repeating-radial-gradient(
+      circle,
+      color-mix(in srgb, var(--color-accent) 20%, transparent) 0 1px,
+      transparent 1px 32px
+    );
+    -webkit-mask-image: radial-gradient(circle, black 0%, transparent 68%);
+    mask-image: radial-gradient(circle, black 0%, transparent 68%);
+  }
+  .hero-radar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      color-mix(in srgb, var(--color-accent) 30%, transparent) 45deg,
+      transparent 90deg
+    );
+    animation: radar-sweep 7s linear infinite;
+  }
+  .hero-radar::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin: -3px;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    box-shadow: 0 0 12px var(--color-accent);
   }
 
   /* Rendered README content on the repo detail page. */
@@ -327,18 +430,19 @@ body::before {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.88em;
     background: var(--color-elevated);
-    border: 1px solid var(--color-border);
     border-radius: 5px;
     padding: 1px 5px;
   }
   .readme pre {
     position: relative;
     background: var(--color-bg);
-    border: 1px solid var(--color-border);
     border-radius: 10px;
     padding: 12px 14px;
     overflow-x: auto;
     margin: 0.8em 0;
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.03),
+      0 8px 22px -14px rgb(0 0 0 / 0.6);
   }
   .readme pre code { background: none; border: none; padding: 0; }
   .readme-copy {
@@ -350,7 +454,6 @@ body::before {
     border-radius: 6px;
     color: var(--color-muted);
     background: var(--color-elevated);
-    border: 1px solid var(--color-border);
     opacity: 0;
     transition: opacity 0.15s, color 0.15s;
     cursor: pointer;
@@ -390,7 +493,8 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   .pulse-dot::after,
-  .radar-bg {
+  .radar-bg,
+  .hero-radar::before {
     animation: none;
   }
 }

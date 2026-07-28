@@ -59,7 +59,7 @@ export default function InstallCommands({ html }: { html: string }) {
       {commands.map((cmd) => (
         <div
           key={cmd}
-          className="group flex items-center gap-2 rounded-lg border border-border/60 bg-bg px-3 py-2"
+          className="group flex items-center gap-2 rounded-lg bg-bg px-3 py-2 shadow-[0_6px_18px_-12px_rgb(0_0_0/0.6)]"
         >
           <code className="flex-1 min-w-0 truncate font-mono text-xs text-text">{cmd}</code>
           <button

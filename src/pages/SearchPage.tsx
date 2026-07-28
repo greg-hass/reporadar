@@ -66,7 +66,7 @@ export default function SearchPage() {
       {!enabled ? (
         <div className="flex flex-col items-center text-center pt-14 md:pt-24 pb-10 animate-fade-up">
           <Logo size={56} />
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-6">
+          <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight mt-6">
             Find your next favorite repo
           </h1>
           <p className="text-muted text-sm md:text-base mt-2.5 max-w-md">
