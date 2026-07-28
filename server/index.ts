@@ -235,12 +235,47 @@ async function runTrackingJob(): Promise<void> {
     console.error("[cron] skipping: GITHUB_SERVER_TOKEN and POSTGRES_URL must be set");
     return;
   }
-  const queries = ["stars:>50", "stars:>100 topic:ai", "stars:>100 topic:cli"];
+  // Candidate discovery: a fixed base set plus a rotating slice picked by
+  // hour-of-day, so the tracked pool diversifies over time without blowing
+  // through the GitHub search rate limit (30 req/min authenticated).
+  // `fresh` queries target newly-created repos; the rest target established
+  // repos that are still active (pushed within the last 30 days).
+  const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const baseQueries: { q: string; fresh?: boolean }[] = [
+    { q: "stars:>50", fresh: true }, // broad net, recently created
+    { q: "stars:>100 topic:ai", fresh: true },
+    { q: "stars:>100 topic:cli", fresh: true },
+    { q: `stars:>1000 pushed:>${monthAgo}` }, // established repos still active
+  ];
+  const rotatingQueries: { q: string; fresh?: boolean }[] = [
+    { q: `stars:>500 language:typescript pushed:>${monthAgo}` },
+    { q: `stars:>500 language:python pushed:>${monthAgo}` },
+    { q: `stars:>500 language:rust pushed:>${monthAgo}` },
+    { q: `stars:>500 language:go pushed:>${monthAgo}` },
+    { q: "stars:>200 topic:llm", fresh: true },
+    { q: "stars:>200 topic:agents", fresh: true },
+    { q: "stars:>200 topic:mcp", fresh: true },
+    { q: `stars:>200 topic:devtools pushed:>${monthAgo}` },
+    { q: `stars:>200 topic:self-hosted pushed:>${monthAgo}` },
+    { q: `stars:>200 topic:react pushed:>${monthAgo}` },
+    { q: `stars:>200 topic:machine-learning pushed:>${monthAgo}` },
+    { q: `stars:>200 topic:security pushed:>${monthAgo}` },
+  ];
+  const hour = new Date().getHours();
+  const rotated = [
+    rotatingQueries[hour % rotatingQueries.length],
+    rotatingQueries[(hour + 4) % rotatingQueries.length],
+    rotatingQueries[(hour + 8) % rotatingQueries.length],
+  ];
+  const queries = [...baseQueries, ...rotated];
   const seen = new Set<number>();
   const candidates: NormalizedRepo[] = [];
-  for (const q of queries) {
+  for (const { q, fresh } of queries) {
     try {
-      const { items } = await githubSearch({ q, createdSinceDays: 7, sort: "stars", page: 1 }, token);
+      const { items } = await githubSearch(
+        { q, createdSinceDays: fresh ? 7 : undefined, sort: "stars", page: 1 },
+        token
+      );
       for (const r of items) {
         if (!seen.has(r.id)) {
           seen.add(r.id);
