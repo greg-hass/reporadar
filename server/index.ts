@@ -66,10 +66,10 @@ app.get("/api/risers", async (req, res) => {
   const windowRaw = ONE(req.query.window) ?? "7d";
   const windowDays = windowRaw === "1d" ? 1 : windowRaw === "30d" ? 30 : 7;
   const page = Math.max(1, Number(ONE(req.query.page)) || 1);
-  const limit = 30;
+  const limit = 50;
   try {
-    const items = await queryRisers(connStr, windowDays, limit, (page - 1) * limit);
-    res.json({ items, total: items.length });
+    const { items, total } = await queryRisers(connStr, windowDays, limit, (page - 1) * limit);
+    res.json({ items, total });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : "risers failed" });
   }

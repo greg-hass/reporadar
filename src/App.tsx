@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import MobileNav from "./components/MobileNav";
-import PulsePage from "./pages/PulsePage";
 import SearchPage from "./pages/SearchPage";
 import NewPage from "./pages/NewPage";
 import RisersPage from "./pages/RisersPage";
@@ -18,10 +17,10 @@ export default function App() {
           <Header />
           <main className="flex-1 px-4 pt-5 pb-24 md:px-6 md:pt-6 md:pb-10 lg:px-10 lg:pt-8">
             <Routes>
-              <Route path="/" element={<PulsePage />} />
+              <Route path="/" element={<RisersPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/new" element={<NewPage />} />
-              <Route path="/risers" element={<RisersPage />} />
+              <Route path="/risers" element={<Navigate to="/" replace />} />
               <Route path="/favourites" element={<FavouritesPage />} />
               <Route path="/repo/:owner/:name" element={<RepoDetailPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

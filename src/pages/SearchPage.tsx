@@ -95,7 +95,11 @@ export default function SearchPage() {
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="eyebrow !text-[10px]">
-              {isLoading ? "Searching…" : total !== undefined ? `${total.toLocaleString()} results` : ""}
+              {isLoading
+                ? "Searching…"
+                : total !== undefined
+                  ? `Showing ${items.length} of ~${Math.min(total, 1000).toLocaleString()} results`
+                  : ""}
             </span>
             <div className="flex gap-2 items-center ml-auto">
               <DensityToggle value={density} onChange={setDensity} />

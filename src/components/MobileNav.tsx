@@ -5,7 +5,7 @@ import { NAV_TABS } from "./nav";
 export default function MobileNav() {
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-bg/85 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-4">
         {NAV_TABS.map((t) => (
           <NavLink
             key={t.to}

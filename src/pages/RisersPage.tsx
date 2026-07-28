@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import RepoRow from "../components/RepoRow";
 import RiserRow from "../components/RiserRow";
+import HeroRiser from "../components/HeroRiser";
 import DensityToggle from "../components/DensityToggle";
 import SegmentedControl from "../components/SegmentedControl";
 import RepoListSkeleton from "../components/Skeleton";
@@ -26,6 +27,10 @@ export default function RisersPage() {
   const { data, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = useRisers(win);
 
   const items = data?.pages.flatMap((p) => p.items) ?? [];
+  const total = data?.pages[0]?.total;
+  // #1 gets the hero spotlight; the list starts at #2 and paginates from there.
+  const hero = items[0];
+  const rest = items.slice(1);
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
@@ -44,7 +49,7 @@ export default function RisersPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-0">
           <div className="eyebrow">Signal monitor · last {win}</div>
-          <h1 className="text-2xl font-extrabold tracking-tight mt-1">Fast Risers</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight mt-1">Trending</h1>
           <p className="text-xs text-muted mt-1">
             Most stars gained, computed from our hourly snapshots
           </p>
@@ -61,45 +66,53 @@ export default function RisersPage() {
         <RepoListSkeleton />
       ) : error ? (
         <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
-      ) : items.length === 0 ? (
+      ) : !hero ? (
         <EmptyState
           title="No risers yet"
           hint="Risers appear after the hourly snapshot job has run at least twice."
         />
       ) : (
         <>
-          <div className="flex flex-col gap-2.5">
-            {items.map((repo, i) =>
-              density === "compact" ? (
-                <RepoRow
-                  key={repo.id}
-                  repo={repo}
-                  rank={i + 1}
-                  selected={sel === i}
-                  compact
-                  stagger={i}
-                  right={
-                    <div className="text-right shrink-0">
-                      <div className="font-mono tabular-nums text-sm font-bold text-success">
-                        +{(repo.starDelta ?? 0).toLocaleString()}
+          <HeroRiser repo={hero} windowDays={WINDOW_DAYS[win]} />
+          {total !== undefined && (
+            <p className="text-[11px] text-muted px-1">
+              Showing {items.length} of {total.toLocaleString()} tracked repos
+            </p>
+          )}
+          {rest.length > 0 && (
+            <div className="flex flex-col gap-2.5">
+              {rest.map((repo, i) =>
+                density === "compact" ? (
+                  <RepoRow
+                    key={repo.id}
+                    repo={repo}
+                    rank={i + 2}
+                    selected={sel === i + 1}
+                    compact
+                    stagger={i}
+                    right={
+                      <div className="text-right shrink-0">
+                        <div className="font-mono tabular-nums text-sm font-bold text-success">
+                          +{(repo.starDelta ?? 0).toLocaleString()}
+                        </div>
+                        <div className="text-[9px] uppercase tracking-wider text-muted">· {win}</div>
                       </div>
-                      <div className="text-[9px] uppercase tracking-wider text-muted">· {win}</div>
-                    </div>
-                  }
-                />
-              ) : (
-                <RiserRow
-                  key={repo.id}
-                  repo={repo}
-                  rank={i + 1}
-                  windowDays={WINDOW_DAYS[win]}
-                  window={win}
-                  selected={sel === i}
-                  stagger={i}
-                />
-              )
-            )}
-          </div>
+                    }
+                  />
+                ) : (
+                  <RiserRow
+                    key={repo.id}
+                    repo={repo}
+                    rank={i + 2}
+                    windowDays={WINDOW_DAYS[win]}
+                    window={win}
+                    selected={sel === i + 1}
+                    stagger={i}
+                  />
+                )
+              )}
+            </div>
+          )}
           <LoadMore
             hasNextPage={hasNextPage ?? false}
             isFetchingNextPage={isFetchingNextPage}

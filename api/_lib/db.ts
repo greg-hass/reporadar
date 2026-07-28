@@ -103,9 +103,11 @@ export async function upsertAndSnapshot(repos: NormalizedRepo[], connStr: string
   }
 }
 
-export async function queryRisers(connStr: string, windowDays: number, limit: number, offset = 0): Promise<
-  (NormalizedRepo & { starDelta: number; history: number[] })[]
-> {
+export async function queryRisers(connStr: string, windowDays: number, limit: number, offset = 0): Promise<{
+  items: (NormalizedRepo & { starDelta: number; history: number[] })[];
+  /** total repos in the latest snapshot (i.e. how many risers exist overall) */
+  total: number;
+}> {
   const { Client } = await import("pg");
   const client = new Client(parseConn(connStr));
   await client.connect();
@@ -147,7 +149,14 @@ export async function queryRisers(connStr: string, windowDays: number, limit: nu
       );
       for (const h of hist.rows) historyMap[h.repo_id as number] = h.pts as number[];
     }
-    return rows.map((r) => ({ ...r, starDelta: r.delta, history: historyMap[r.id] ?? [] }));
+    const countRes = await client.query(
+      `SELECT COUNT(*)::int AS n FROM star_snapshots
+       WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)`
+    );
+    return {
+      items: rows.map((r) => ({ ...r, starDelta: r.delta, history: historyMap[r.id] ?? [] })),
+      total: (countRes.rows[0]?.n as number) ?? 0,
+    };
   } finally {
     await client.end();
   }

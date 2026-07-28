@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { ActivityIcon, SearchIcon, SparklesIcon, StarIcon, TrendingUpIcon } from "./icons";
+import { SearchIcon, SparklesIcon, StarIcon, TrendingUpIcon } from "./icons";
 
 export interface NavTab {
   to: string;
@@ -8,9 +8,8 @@ export interface NavTab {
 }
 
 export const NAV_TABS: NavTab[] = [
-  { to: "/", label: "Pulse", icon: ActivityIcon },
+  { to: "/", label: "Trending", icon: TrendingUpIcon },
   { to: "/search", label: "Search", icon: SearchIcon },
-  { to: "/new", label: "New", icon: SparklesIcon },
-  { to: "/risers", label: "Fast Risers", icon: TrendingUpIcon },
+  { to: "/new", label: "Fresh", icon: SparklesIcon },
   { to: "/favourites", label: "Favourites", icon: StarIcon },
 ];
