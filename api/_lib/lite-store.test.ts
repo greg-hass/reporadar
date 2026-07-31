@@ -60,4 +60,22 @@ describe("LiteStore", () => {
 			history: [12],
 		});
 	});
+
+	it("survives concurrent mutations without losing writes", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-lite-"));
+		tempDirs.push(dir);
+		const store = new LiteStore(dir);
+		const second = { ...repo, id: 43, fullName: "other/owner" };
+
+		// Fire both mutations without awaiting between them — the write chain
+		// must serialize the two persists so neither clobbers the other.
+		await Promise.all([
+			store.addFavourite(repo),
+			store.addFavourite(second),
+		]);
+
+		const reloaded = new LiteStore(dir);
+		const ids = await reloaded.listFavouriteIds();
+		expect(ids.sort()).toEqual([42, 43]);
+	});
 });

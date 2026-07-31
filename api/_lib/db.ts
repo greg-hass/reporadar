@@ -1,26 +1,22 @@
-import { types } from "pg";
+import { Pool, types } from "pg";
 import type { NormalizedRepo } from "./github";
 
 // GitHub repo ids are well under 2^53; parse bigint columns back to numbers so that
 // `r.id` is numeric (matching the search API), not the pg-default string.
 types.setTypeParser(types.builtins.INT8, (v: string) => Number(v));
 
-export function parseConnectionString(cs: string): {
-	host: string;
-	port: number;
-	user: string;
-	password: string;
-	database: string;
-} {
-	// postgres://user:password@host:port/database
-	const u = new URL(cs);
-	return {
-		user: decodeURIComponent(u.username),
-		password: decodeURIComponent(u.password),
-		host: u.hostname,
-		port: Number(u.port) || 5432,
-		database: u.pathname.replace(/^\//, ""),
-	};
+// One Pool per connection string, reused for the app's lifetime. Opening and
+// closing a fresh Client on every query (as this file once did) burns a TCP
+// connection + auth handshake per call and falls over under any concurrency.
+const pools = new Map<string, Pool>();
+
+function getPool(connStr: string): Pool {
+	let pool = pools.get(connStr);
+	if (!pool) {
+		pool = new Pool({ connectionString: connStr });
+		pools.set(connStr, pool);
+	}
+	return pool;
 }
 
 // Schema DDL — keep in sync with supabase/migrations/001_init.sql.
@@ -63,27 +59,17 @@ CREATE TABLE IF NOT EXISTS favourites (
 
 /** Creates the schema if missing. Safe to call on every boot. */
 export async function ensureSchema(connStr: string): Promise<void> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		await client.query(SCHEMA_SQL);
-	} finally {
-		await client.end();
-	}
+	await getPool(connStr).query(SCHEMA_SQL);
 }
 
 /**
- * Upserts a repo and appends a star snapshot using a single connection.
+ * Upserts a repo and appends a star snapshot in a single transaction.
  */
 export async function upsertAndSnapshot(
 	repos: NormalizedRepo[],
 	connStr: string,
 ): Promise<void> {
-	const { Client } = await import("pg");
-	const cfg = parseConnectionString(connStr);
-	const client = new Client(cfg);
-	await client.connect();
+	const client = await getPool(connStr).connect();
 	try {
 		await client.query("BEGIN");
 		for (const r of repos) {
@@ -125,7 +111,7 @@ export async function upsertAndSnapshot(
 		}
 		throw e;
 	} finally {
-		await client.end();
+		client.release();
 	}
 }
 
@@ -139,12 +125,9 @@ export async function queryRisers(
 	/** total repos in the latest snapshot (i.e. how many risers exist overall) */
 	total: number;
 }> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		const res = await client.query(
-			`WITH latest AS (
+	const pool = getPool(connStr);
+	const res = await pool.query(
+		`WITH latest AS (
          SELECT repo_id, stars, captured_at
          FROM star_snapshots
          WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)
@@ -165,37 +148,34 @@ export async function queryRisers(
        LEFT JOIN past ON past.repo_id = latest.repo_id
        ORDER BY delta DESC
        LIMIT $2 OFFSET $3`,
-			[String(windowDays), limit, offset],
-		);
-		const rows = res.rows as (NormalizedRepo & { delta: number })[];
-		const ids = rows.map((r) => r.id);
-		const historyMap: Record<number, number[]> = {};
-		if (ids.length) {
-			const hist = await client.query(
-				`SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
+		[String(windowDays), limit, offset],
+	);
+	const rows = res.rows as (NormalizedRepo & { delta: number })[];
+	const ids = rows.map((r) => r.id);
+	const historyMap: Record<number, number[]> = {};
+	if (ids.length) {
+		const hist = await pool.query(
+			`SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
          FROM star_snapshots
          WHERE repo_id = ANY($1::bigint[]) AND captured_at >= now() - '7 days'::interval
          GROUP BY repo_id`,
-				[ids],
-			);
-			for (const h of hist.rows)
-				historyMap[h.repo_id as number] = h.pts as number[];
-		}
-		const countRes = await client.query(
-			`SELECT COUNT(*)::int AS n FROM star_snapshots
-       WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)`,
+			[ids],
 		);
-		return {
-			items: rows.map((r) => ({
-				...r,
-				starDelta: r.delta,
-				history: historyMap[r.id] ?? [],
-			})),
-			total: (countRes.rows[0]?.n as number) ?? 0,
-		};
-	} finally {
-		await client.end();
+		for (const h of hist.rows)
+			historyMap[h.repo_id as number] = h.pts as number[];
 	}
+	const countRes = await pool.query(
+		`SELECT COUNT(*)::int AS n FROM star_snapshots
+       WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)`,
+	);
+	return {
+		items: rows.map((r) => ({
+			...r,
+			starDelta: r.delta,
+			history: historyMap[r.id] ?? [],
+		})),
+		total: (countRes.rows[0]?.n as number) ?? 0,
+	};
 }
 
 export interface RepoStats {
@@ -207,12 +187,8 @@ export interface RepoStats {
 
 /** Dashboard counters for the Observatory stats band. */
 export async function queryStats(connStr: string): Promise<RepoStats> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		const res = await client.query(
-			`SELECT
+	const res = await getPool(connStr).query(
+		`SELECT
          (SELECT count(*) FROM repos) AS "reposTracked",
          (SELECT count(*) FROM star_snapshots WHERE captured_at::date = now()::date) AS "snapshotsToday",
          (SELECT COALESCE(SUM(latest - earliest), 0) FROM (
@@ -220,19 +196,16 @@ export async function queryStats(connStr: string): Promise<RepoStats> {
             FROM star_snapshots WHERE captured_at::date = now()::date GROUP BY repo_id
           ) t) AS "starsGainedToday",
          (SELECT max(captured_at) FROM star_snapshots) AS "lastSnapshotAt"`,
-		);
-		const r = res.rows[0];
-		return {
-			reposTracked: Number(r.reposTracked),
-			snapshotsToday: Number(r.snapshotsToday),
-			starsGainedToday: Number(r.starsGainedToday),
-			lastSnapshotAt: r.lastSnapshotAt
-				? new Date(r.lastSnapshotAt).toISOString()
-				: null,
-		};
-	} finally {
-		await client.end();
-	}
+	);
+	const r = res.rows[0];
+	return {
+		reposTracked: Number(r.reposTracked),
+		snapshotsToday: Number(r.snapshotsToday),
+		starsGainedToday: Number(r.starsGainedToday),
+		lastSnapshotAt: r.lastSnapshotAt
+			? new Date(r.lastSnapshotAt).toISOString()
+			: null,
+	};
 }
 
 /** Reads timestamped star history for one repo (chart tooltips). */
@@ -246,23 +219,16 @@ export async function queryHistory(
 	repoId: number,
 	days: number,
 ): Promise<HistoryPoint[]> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		const res = await client.query(
-			`SELECT captured_at AS t, stars FROM star_snapshots
+	const res = await getPool(connStr).query(
+		`SELECT captured_at AS t, stars FROM star_snapshots
        WHERE repo_id = $1 AND captured_at >= now() - ($2 || ' days')::interval
        ORDER BY captured_at`,
-			[repoId, String(days)],
-		);
-		return res.rows.map((r) => ({
-			t: new Date(r.t).toISOString(),
-			stars: r.stars as number,
-		}));
-	} finally {
-		await client.end();
-	}
+		[repoId, String(days)],
+	);
+	return res.rows.map((r) => ({
+		t: new Date(r.t).toISOString(),
+		stars: r.stars as number,
+	}));
 }
 
 /** Single repo by full_name, or null when not tracked. */
@@ -270,64 +236,38 @@ export async function queryRepoByName(
 	connStr: string,
 	fullName: string,
 ): Promise<NormalizedRepo | null> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		const res = await client.query(
-			`SELECT id, full_name AS "fullName", description, language, topics,
+	const res = await getPool(connStr).query(
+		`SELECT id, full_name AS "fullName", description, language, topics,
               stars_total AS "starsTotal", forks, created_at AS "createdAt",
               pushed_at AS "pushedAt", license, owner_avatar AS "ownerAvatar", html_url AS "htmlUrl"
        FROM repos WHERE full_name = $1`,
-			[fullName],
-		);
-		return (res.rows[0] as NormalizedRepo | undefined) ?? null;
-	} finally {
-		await client.end();
-	}
+		[fullName],
+	);
+	return (res.rows[0] as NormalizedRepo | undefined) ?? null;
 }
 
 export async function listFavouriteIds(connStr: string): Promise<number[]> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		const res = await client.query(`SELECT repo_id FROM favourites`);
-		return res.rows.map((r) => r.repo_id as number);
-	} finally {
-		await client.end();
-	}
+	const res = await getPool(connStr).query(`SELECT repo_id FROM favourites`);
+	return res.rows.map((r) => r.repo_id as number);
 }
 
 export async function addFavourite(
 	connStr: string,
 	repo: NormalizedRepo,
 ): Promise<void> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		await client.query(
-			`INSERT INTO favourites (repo_id, payload) VALUES ($1, $2) ON CONFLICT (repo_id) DO NOTHING`,
-			[repo.id, JSON.stringify(repo)],
-		);
-	} finally {
-		await client.end();
-	}
+	await getPool(connStr).query(
+		`INSERT INTO favourites (repo_id, payload) VALUES ($1, $2) ON CONFLICT (repo_id) DO NOTHING`,
+		[repo.id, JSON.stringify(repo)],
+	);
 }
 
 export async function removeFavourite(
 	connStr: string,
 	repoId: number,
 ): Promise<void> {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		await client.query(`DELETE FROM favourites WHERE repo_id = $1`, [repoId]);
-	} finally {
-		await client.end();
-	}
+	await getPool(connStr).query(`DELETE FROM favourites WHERE repo_id = $1`, [
+		repoId,
+	]);
 }
 
 /** Favourites with riser-style velocity; falls back to the stored payload when not yet snapshotted. */
@@ -337,12 +277,9 @@ export async function queryFavourites(
 ): Promise<
 	(NormalizedRepo & { starDelta: number | null; history: number[] })[]
 > {
-	const { Client } = await import("pg");
-	const client = new Client(parseConnectionString(connStr));
-	await client.connect();
-	try {
-		const res = await client.query(
-			`WITH latest AS (
+	const pool = getPool(connStr);
+	const res = await pool.query(
+		`WITH latest AS (
          SELECT repo_id, stars FROM star_snapshots
          WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)
        ),
@@ -370,28 +307,25 @@ export async function queryFavourites(
        LEFT JOIN latest ON latest.repo_id = f.repo_id
        LEFT JOIN past ON past.repo_id = f.repo_id
        ORDER BY f.added_at DESC`,
-			[String(windowDays)],
-		);
-		const rows = res.rows as (NormalizedRepo & { delta: number | null })[];
-		const ids = rows.map((r) => r.id);
-		const historyMap: Record<number, number[]> = {};
-		if (ids.length) {
-			const hist = await client.query(
-				`SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
+		[String(windowDays)],
+	);
+	const rows = res.rows as (NormalizedRepo & { delta: number | null })[];
+	const ids = rows.map((r) => r.id);
+	const historyMap: Record<number, number[]> = {};
+	if (ids.length) {
+		const hist = await pool.query(
+			`SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
          FROM star_snapshots
          WHERE repo_id = ANY($1::bigint[]) AND captured_at >= now() - '7 days'::interval
          GROUP BY repo_id`,
-				[ids],
-			);
-			for (const h of hist.rows)
-				historyMap[h.repo_id as number] = h.pts as number[];
-		}
-		return rows.map((r) => ({
-			...r,
-			starDelta: r.delta ?? null,
-			history: historyMap[r.id] ?? [],
-		}));
-	} finally {
-		await client.end();
+			[ids],
+		);
+		for (const h of hist.rows)
+			historyMap[h.repo_id as number] = h.pts as number[];
 	}
+	return rows.map((r) => ({
+		...r,
+		starDelta: r.delta ?? null,
+		history: historyMap[r.id] ?? [],
+	}));
 }

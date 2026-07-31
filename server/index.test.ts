@@ -160,4 +160,16 @@ describe("RepoRadar API", () => {
 		});
 		expect(nonNumber.status).toBe(400);
 	});
+
+	it("defaults a malformed days window instead of 500ing", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-days-"));
+		tempDirs.push(dir);
+		const baseUrl = await listen(
+			createApp({ mode: "lite", dataDir: dir }),
+		);
+
+		const response = await fetch(`${baseUrl}/api/repos/42/history?days=abc`);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ points: [] });
+	});
 });

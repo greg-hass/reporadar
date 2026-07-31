@@ -227,7 +227,20 @@ export class LiteStore implements RepoStorage {
 		}
 	}
 
-	private async persist(): Promise<void> {
+	// Serializes writes through a promise chain. Without this, two concurrent
+	// mutations (hourly cron + a favourite toggle) both write to the same .tmp
+	// file and the last rename wins — losing the other mutation's changes.
+	private writeChain: Promise<void> = Promise.resolve();
+
+	private persist(): Promise<void> {
+		const write = this.writeChain.then(() => this.writeState());
+		// Keep the chain alive even when a write fails; the caller still sees
+		// the rejection through `write`.
+		this.writeChain = write.catch(() => {});
+		return write;
+	}
+
+	private async writeState(): Promise<void> {
 		await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true });
 		const temporaryPath = `${this.filePath}.tmp`;
 		await fs.promises.writeFile(

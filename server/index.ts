@@ -123,7 +123,9 @@ export function createApp(
 			return;
 		}
 		try {
-			const days = req.query.days ? Number(ONE(req.query.days)) : 30;
+			const rawDays = req.query.days ? Number(ONE(req.query.days)) : 30;
+			const days =
+				Number.isFinite(rawDays) && rawDays > 0 ? rawDays : 30;
 			res.json({ points: await storage.queryHistory(id, days) });
 		} catch (error) {
 			res
