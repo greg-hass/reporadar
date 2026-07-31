@@ -4,17 +4,17 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 env:
   IMAGE: ghcr.io/greg-hass/reporadar
 
 jobs:
-  build-and-push:
+  # Verification gate: every push to main, tag, and pull request must pass
+  # tests, typechecks, and a production build before anything ships.
+  verify:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +28,17 @@ jobs:
       - run: npm run typecheck
       - run: npm run typecheck:api
       - run: npm run build
+
+  # Publish: only on pushes to main or version tags — never from PRs.
+  build-and-push:
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
