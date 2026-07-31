@@ -1,4 +1,4 @@
-import type { NormalizedRepo } from "./github";
+import type { NormalizedRepo } from "./github.js";
 
 /**
  * Favourites arrive as an unauthenticated PUT body, so the server must not
@@ -43,6 +43,15 @@ function asHttpUrl(value: unknown, fallback: string): string {
 	return fallback;
 }
 
+function sanitizeTopics(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+
+	return value
+		.filter((topic): topic is string => typeof topic === "string")
+		.map((topic) => topic.slice(0, MAX_TOPIC_LENGTH))
+		.slice(0, MAX_TOPIC_COUNT);
+}
+
 export function sanitizeFavouritePayload(
 	input: unknown,
 	id: number,
@@ -55,15 +64,7 @@ export function sanitizeFavouritePayload(
 
 	const owner = fullName.split("/")[0];
 	const nowIso = new Date().toISOString();
-	const topics = Array.isArray(body.topics)
-		? body.topics
-				.flatMap((topic) =>
-					typeof topic === "string"
-						? [topic.slice(0, MAX_TOPIC_LENGTH)]
-						: [],
-				)
-				.slice(0, MAX_TOPIC_COUNT)
-		: [];
+	const topics = sanitizeTopics(body.topics);
 
 	return {
 		id,

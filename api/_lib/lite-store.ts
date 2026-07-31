@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { NormalizedRepo } from "./github";
-import type { HistoryPoint, RepoStats } from "./db";
-import type { RepoStorage } from "./storage";
+import type { NormalizedRepo } from "./github.js";
+import type { HistoryPoint, RepoStats } from "./db.js";
+import type { RepoStorage } from "./storage.js";
 
 type Snapshot = {
 	repoId: number;
@@ -27,6 +27,10 @@ function cloneState(state: LiteState): LiteState {
 	};
 }
 
+// This class intentionally owns the complete file-backed store: keeping state,
+// persistence, and query semantics together avoids duplicating the lite-mode
+// consistency rules across several small wrappers.
+// pi-lens-ignore: large-class
 export class LiteStore implements RepoStorage {
 	readonly mode = "lite" as const;
 	private readonly filePath: string;
@@ -37,6 +41,7 @@ export class LiteStore implements RepoStorage {
 		this.state = this.load();
 	}
 
+	// Adapter for the RepoStorage interface; lite mode has no schema step.
 	ensureSchema(): Promise<void> {
 		return Promise.resolve();
 	}
@@ -67,7 +72,14 @@ export class LiteStore implements RepoStorage {
 		await this.persist();
 	}
 
-	async queryRisers(windowDays: number, limit: number, offset = 0) {
+	queryRisers(
+		windowDays: number,
+		limit: number,
+		offset = 0,
+	): Promise<{
+		items: (NormalizedRepo & { starDelta: number; history: number[] })[];
+		total: number;
+	}> {
 		const latest = this.latestSnapshots();
 		const cutoff = Date.now() - windowDays * 86_400_000;
 		const repos = new Map(this.state.repos.map((repo) => [repo.id, repo]));
@@ -97,10 +109,13 @@ export class LiteStore implements RepoStorage {
 			)
 			.sort((a, b) => b.starDelta - a.starDelta || b.starsTotal - a.starsTotal);
 
-		return { items: rows.slice(offset, offset + limit), total: rows.length };
+		return Promise.resolve({
+			items: rows.slice(offset, offset + limit),
+			total: rows.length,
+		});
 	}
 
-	async queryStats(): Promise<RepoStats> {
+	queryStats(): Promise<RepoStats> {
 		const today = new Date().toISOString().slice(0, 10);
 		const todays = this.state.snapshots.filter(
 			(snapshot) => snapshot.capturedAt.slice(0, 10) === today,
@@ -122,12 +137,12 @@ export class LiteStore implements RepoStorage {
 				.sort((a, b) => a.localeCompare(b))
 				.at(-1) ?? null;
 
-		return {
+		return Promise.resolve({
 			reposTracked: this.state.repos.length,
 			snapshotsToday: todays.length,
 			starsGainedToday,
 			lastSnapshotAt,
-		};
+		});
 	}
 
 	async queryHistory(repoId: number, days: number): Promise<HistoryPoint[]> {
@@ -167,27 +182,33 @@ export class LiteStore implements RepoStorage {
 		await this.persist();
 	}
 
-	async queryFavourites(windowDays: number) {
+	queryFavourites(
+		windowDays: number,
+	): Promise<
+		(NormalizedRepo & { starDelta: number | null; history: number[] })[]
+	> {
 		const latest = this.latestSnapshots();
 		const cutoff = Date.now() - windowDays * 86_400_000;
-		return this.state.favourites.map((favourite) => {
-			const current = latest.get(favourite.id);
-			const past = this.state.snapshots
-				.filter(
-					(snapshot) =>
-						snapshot.repoId === favourite.id &&
-						Date.parse(snapshot.capturedAt) >= cutoff,
-				)
-				.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))[0];
-			return {
-				...(this.state.repos.find((repo) => repo.id === favourite.id) ??
-					favourite),
-				starDelta: current
-					? current.stars - (past?.stars ?? current.stars)
-					: null,
-				history: this.historyFor(favourite.id, 7),
-			};
-		});
+		return Promise.resolve(
+			this.state.favourites.map((favourite) => {
+				const current = latest.get(favourite.id);
+				const past = this.state.snapshots
+					.filter(
+						(snapshot) =>
+							snapshot.repoId === favourite.id &&
+							Date.parse(snapshot.capturedAt) >= cutoff,
+					)
+					.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))[0];
+				return {
+					...(this.state.repos.find((repo) => repo.id === favourite.id) ??
+						favourite),
+					starDelta: current
+						? current.stars - (past?.stars ?? current.stars)
+						: null,
+					history: this.historyFor(favourite.id, 7),
+				};
+			}),
+		);
 	}
 
 	private latestSnapshots(): Map<number, Snapshot> {
