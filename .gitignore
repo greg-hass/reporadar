@@ -16,3 +16,4 @@ dist-server/
 
 # lite-mode runtime data
 data/
+graphify-out/
