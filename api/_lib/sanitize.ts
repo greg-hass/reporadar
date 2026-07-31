@@ -57,8 +57,11 @@ export function sanitizeFavouritePayload(
 	const nowIso = new Date().toISOString();
 	const topics = Array.isArray(body.topics)
 		? body.topics
-				.filter((topic): topic is string => typeof topic === "string")
-				.map((topic) => topic.slice(0, MAX_TOPIC_LENGTH))
+				.flatMap((topic) =>
+					typeof topic === "string"
+						? [topic.slice(0, MAX_TOPIC_LENGTH)]
+						: [],
+				)
 				.slice(0, MAX_TOPIC_COUNT)
 		: [];
 

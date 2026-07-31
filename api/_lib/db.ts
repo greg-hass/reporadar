@@ -5,6 +5,11 @@ import type { NormalizedRepo } from "./github";
 // `r.id` is numeric (matching the search API), not the pg-default string.
 types.setTypeParser(types.builtins.INT8, (v: string) => Number(v));
 
+// This module IS the SQL layer. Every statement below is deliberately
+// hand-written and fully parameterized ($1/$2 placeholders, never string
+// interpolation) — an ORM/query builder for eight queries would be
+// over-engineering. The `no-sql-in-code` rule is suppressed per statement.
+//
 // One Pool per connection string, reused for the app's lifetime. Opening and
 // closing a fresh Client on every query (as this file once did) burns a TCP
 // connection + auth handshake per call and falls over under any concurrency.
@@ -73,6 +78,7 @@ export async function upsertAndSnapshot(
 	try {
 		await client.query("BEGIN");
 		for (const r of repos) {
+			// pi-lens-ignore: no-sql-in-code
 			await client.query(
 				`INSERT INTO repos (id, full_name, description, language, topics, stars_total, forks, created_at, pushed_at, license, owner_avatar, html_url, updated_from_gh)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
@@ -96,6 +102,7 @@ export async function upsertAndSnapshot(
 					r.htmlUrl,
 				],
 			);
+			// pi-lens-ignore: no-sql-in-code
 			await client.query(
 				`INSERT INTO star_snapshots (repo_id, captured_at, stars) VALUES ($1, now(), $2)
          ON CONFLICT (repo_id, captured_at) DO NOTHING`,
@@ -126,6 +133,7 @@ export async function queryRisers(
 	total: number;
 }> {
 	const pool = getPool(connStr);
+	// pi-lens-ignore: no-sql-in-code
 	const res = await pool.query(
 		`WITH latest AS (
          SELECT repo_id, stars, captured_at
@@ -154,6 +162,7 @@ export async function queryRisers(
 	const ids = rows.map((r) => r.id);
 	const historyMap: Record<number, number[]> = {};
 	if (ids.length) {
+		// pi-lens-ignore: no-sql-in-code
 		const hist = await pool.query(
 			`SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
          FROM star_snapshots
@@ -164,6 +173,7 @@ export async function queryRisers(
 		for (const h of hist.rows)
 			historyMap[h.repo_id as number] = h.pts as number[];
 	}
+	// pi-lens-ignore: no-sql-in-code
 	const countRes = await pool.query(
 		`SELECT COUNT(*)::int AS n FROM star_snapshots
        WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)`,
@@ -187,6 +197,7 @@ export interface RepoStats {
 
 /** Dashboard counters for the Observatory stats band. */
 export async function queryStats(connStr: string): Promise<RepoStats> {
+	// pi-lens-ignore: no-sql-in-code
 	const res = await getPool(connStr).query(
 		`SELECT
          (SELECT count(*) FROM repos) AS "reposTracked",
@@ -219,6 +230,7 @@ export async function queryHistory(
 	repoId: number,
 	days: number,
 ): Promise<HistoryPoint[]> {
+	// pi-lens-ignore: no-sql-in-code
 	const res = await getPool(connStr).query(
 		`SELECT captured_at AS t, stars FROM star_snapshots
        WHERE repo_id = $1 AND captured_at >= now() - ($2 || ' days')::interval
@@ -236,6 +248,7 @@ export async function queryRepoByName(
 	connStr: string,
 	fullName: string,
 ): Promise<NormalizedRepo | null> {
+	// pi-lens-ignore: no-sql-in-code
 	const res = await getPool(connStr).query(
 		`SELECT id, full_name AS "fullName", description, language, topics,
               stars_total AS "starsTotal", forks, created_at AS "createdAt",
@@ -247,6 +260,7 @@ export async function queryRepoByName(
 }
 
 export async function listFavouriteIds(connStr: string): Promise<number[]> {
+	// pi-lens-ignore: no-sql-in-code
 	const res = await getPool(connStr).query(`SELECT repo_id FROM favourites`);
 	return res.rows.map((r) => r.repo_id as number);
 }
@@ -255,6 +269,7 @@ export async function addFavourite(
 	connStr: string,
 	repo: NormalizedRepo,
 ): Promise<void> {
+	// pi-lens-ignore: no-sql-in-code
 	await getPool(connStr).query(
 		`INSERT INTO favourites (repo_id, payload) VALUES ($1, $2) ON CONFLICT (repo_id) DO NOTHING`,
 		[repo.id, JSON.stringify(repo)],
@@ -265,6 +280,7 @@ export async function removeFavourite(
 	connStr: string,
 	repoId: number,
 ): Promise<void> {
+	// pi-lens-ignore: no-sql-in-code
 	await getPool(connStr).query(`DELETE FROM favourites WHERE repo_id = $1`, [
 		repoId,
 	]);
@@ -278,6 +294,7 @@ export async function queryFavourites(
 	(NormalizedRepo & { starDelta: number | null; history: number[] })[]
 > {
 	const pool = getPool(connStr);
+	// pi-lens-ignore: no-sql-in-code
 	const res = await pool.query(
 		`WITH latest AS (
          SELECT repo_id, stars FROM star_snapshots
@@ -313,6 +330,7 @@ export async function queryFavourites(
 	const ids = rows.map((r) => r.id);
 	const historyMap: Record<number, number[]> = {};
 	if (ids.length) {
+		// pi-lens-ignore: no-sql-in-code
 		const hist = await pool.query(
 			`SELECT repo_id, array_agg(stars ORDER BY captured_at) AS pts
          FROM star_snapshots

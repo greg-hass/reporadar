@@ -352,7 +352,7 @@ export async function runTrackingJob(
 export function startServer(config: AppConfig = readConfig()) {
 	const storage = createStorage(config);
 	const app = createApp(config, storage);
-	const server = app.listen(config.port ?? 3000, () => {
+	return app.listen(config.port ?? 3000, () => {
 		console.log(`RepoRadar listening on :${config.port ?? 3000}`);
 		void (async () => {
 			if (storage.mode === "postgres") {
@@ -390,7 +390,6 @@ export function startServer(config: AppConfig = readConfig()) {
 			}
 		})();
 	});
-	return server;
 }
 
 if (require.main === module) startServer();
