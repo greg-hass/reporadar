@@ -6,6 +6,7 @@ import LanguageDot from "./LanguageDot";
 import Rank from "./Rank";
 import FavButton from "./FavButton";
 import { ExternalLinkIcon } from "./icons";
+import { safeExternalUrl } from "../lib/format";
 
 interface Props {
   repo: Repo;
@@ -57,7 +58,7 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
           </Link>
           <FavButton repo={repo} size={13} />
           <a
-            href={repo.htmlUrl}
+            href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}

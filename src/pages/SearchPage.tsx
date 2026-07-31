@@ -11,6 +11,7 @@ import { Logo } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
+import { safeExternalUrl } from "../lib/format";
 import type { Repo, SortKey } from "../lib/types";
 
 const EXAMPLES = ["terminal emulator", "llm agent framework", "self-hosted dashboard"];
@@ -44,7 +45,7 @@ export default function SearchPage() {
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
-    onExternal: (i) => window.open(items[i].htmlUrl, "_blank", "noreferrer"),
+    onExternal: (i) => window.open(safeExternalUrl(items[i].htmlUrl, items[i].fullName), "_blank", "noreferrer"),
   });
 
   const patch = (p: Record<string, string | number>) => {

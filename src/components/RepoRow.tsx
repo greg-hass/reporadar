@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Repo } from "../lib/types";
-import { compactNumber } from "../lib/format";
+import { compactNumber, safeExternalUrl } from "../lib/format";
 import { ExternalLinkIcon, ForkIcon, StarIcon } from "./icons";
 import LanguageDot from "./LanguageDot";
 import Rank from "./Rank";
@@ -48,7 +48,7 @@ export default function RepoRow({ repo, rank, selected, compact, stagger = 0, ri
           </Link>
           <FavButton repo={repo} size={13} />
           <a
-            href={repo.htmlUrl}
+            href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}

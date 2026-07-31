@@ -12,6 +12,7 @@ import { EmptyState, ErrorState } from "../components/States";
 import { useRisers } from "../hooks/useRisers";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
+import { safeExternalUrl } from "../lib/format";
 
 type Window = "1d" | "7d" | "30d";
 const WINDOW_OPTIONS: { value: Window; label: string }[] = [
@@ -34,7 +35,7 @@ export default function RisersPage() {
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
-    onExternal: (i) => window.open(items[i].htmlUrl, "_blank", "noreferrer"),
+    onExternal: (i) => window.open(safeExternalUrl(items[i].htmlUrl, items[i].fullName), "_blank", "noreferrer"),
   });
 
   const changeWindow = (w: Window) => {

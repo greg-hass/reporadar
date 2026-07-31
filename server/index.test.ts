@@ -95,4 +95,69 @@ describe("RepoRadar API", () => {
 			starDelta: 0,
 		});
 	});
+
+	it("sanitizes hostile favourite payloads before storing them", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-"));
+		tempDirs.push(dir);
+		const baseUrl = await listen(
+			createApp({ mode: "lite", dataDir: dir }),
+		);
+
+		const put = await fetch(`${baseUrl}/api/favourites/7`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: 999,
+				fullName: "attacker/pwn",
+				htmlUrl: "javascript:alert(1)",
+				ownerAvatar: "data:text/html,<svg onload=alert(1)>",
+				description: "x".repeat(5000),
+				starsTotal: -9000,
+				forks: Number.NaN,
+				topics: ["a".repeat(500), 7],
+				extra: "stripped",
+			}),
+		});
+		expect(put.status).toBe(200);
+
+		const ids = await fetch(`${baseUrl}/api/favourites/ids`);
+		const { ids: storedIds } = (await ids.json()) as { ids: number[] };
+		expect(storedIds).toEqual([7]);
+
+		const favourites = await fetch(`${baseUrl}/api/favourites`);
+		const { items } = (await favourites.json()) as {
+			items: Array<Record<string, unknown>>;
+		};
+		expect(items[0]).toMatchObject({
+			id: 7,
+			fullName: "attacker/pwn",
+			htmlUrl: "https://github.com/attacker/pwn",
+			ownerAvatar: "https://github.com/attacker.png",
+			starsTotal: 0,
+			topics: ["a".repeat(100)],
+		});
+		expect(items[0]).not.toHaveProperty("extra");
+	});
+
+	it("rejects malformed favourite payloads", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-bad-"));
+		tempDirs.push(dir);
+		const baseUrl = await listen(
+			createApp({ mode: "lite", dataDir: dir }),
+		);
+
+		const bad = await fetch(`${baseUrl}/api/favourites/1`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: 1, fullName: "not-a-valid-name" }),
+		});
+		expect(bad.status).toBe(400);
+
+		const nonNumber = await fetch(`${baseUrl}/api/favourites/not-a-number`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ fullName: "owner/name" }),
+		});
+		expect(nonNumber.status).toBe(400);
+	});
 });

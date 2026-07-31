@@ -3,6 +3,28 @@ export function compactNumber(n: number): string {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
+/**
+ * Only http(s) URLs may be used as external link targets. Anything else
+ * (javascript:, data:, vbscript:…) falls back to the canonical GitHub URL,
+ * which is also what the server derives for favourited repos.
+ */
+export function safeExternalUrl(
+  url: string | null | undefined,
+  fullName: string,
+): string {
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+        return url;
+      }
+    } catch {
+      // not a URL — fall through to the canonical fallback
+    }
+  }
+  return `https://github.com/${fullName}`;
+}
+
 /** "just now" / "12 min ago" / "3 h ago" / "2 d ago" for an ISO timestamp. */
 export function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();

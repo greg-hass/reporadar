@@ -10,7 +10,7 @@ import { SparklesIcon } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
-import { relativeTime } from "../lib/format";
+import { relativeTime, safeExternalUrl } from "../lib/format";
 import type { Repo } from "../lib/types";
 
 type Days = "1" | "7" | "30";
@@ -41,7 +41,7 @@ export default function NewPage() {
   const navigate = useNavigate();
   const { sel, reset } = useRovingKeys(items.length, {
     onOpen: (i) => navigate(`/repo/${items[i].fullName}`),
-    onExternal: (i) => window.open(items[i].htmlUrl, "_blank", "noreferrer"),
+    onExternal: (i) => window.open(safeExternalUrl(items[i].htmlUrl, items[i].fullName), "_blank", "noreferrer"),
   });
 
   const changeDays = (d: Days) => {

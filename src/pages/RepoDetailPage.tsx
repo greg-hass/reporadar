@@ -11,7 +11,7 @@ import { useRepo } from "../hooks/useRepo";
 import { useHistory } from "../hooks/useHistory";
 import { useReadme } from "../hooks/useReadme";
 import { useFavouriteIds, useToggleFavourite } from "../hooks/useFavourites";
-import { compactNumber } from "../lib/format";
+import { compactNumber, safeExternalUrl } from "../lib/format";
 
 type Days = "7" | "30" | "90";
 const DAYS_OPTIONS: { value: Days; label: string }[] = [
@@ -135,7 +135,7 @@ export default function RepoDetailPage() {
                   {isFav ? "Favourited" : "Favourite"}
                 </button>
                 <a
-                  href={repo.htmlUrl}
+                  href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
                   target="_blank"
                   rel="noreferrer"
                   className="btn-primary flex items-center gap-1.5 px-3.5 py-2 text-xs"

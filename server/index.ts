@@ -14,6 +14,7 @@ import {
 	type RepoStorage,
 	type StorageConfig,
 } from "../api/_lib/storage";
+import { sanitizeFavouritePayload } from "../api/_lib/sanitize";
 
 export interface AppConfig extends StorageConfig {
 	port?: number;
@@ -201,12 +202,13 @@ export function createApp(
 	});
 
 	app.put("/api/favourites/:id", async (req, res) => {
-		const repo = req.body as NormalizedRepo | undefined;
-		if (
-			!repo ||
-			!Number.isFinite(repo.id) ||
-			typeof repo.fullName !== "string"
-		) {
+		const id = Number(req.params.id);
+		if (!Number.isFinite(id)) {
+			res.status(400).json({ error: "repo id must be a number" });
+			return;
+		}
+		const repo = sanitizeFavouritePayload(req.body, id);
+		if (!repo) {
 			res.status(400).json({ error: "repo payload required" });
 			return;
 		}
