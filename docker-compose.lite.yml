@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    image: reporadar:lite
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      REPORADAR_MODE: lite
+      REPORADAR_DATA_DIR: /app/data
+      CRON_SCHEDULE: ${CRON_SCHEDULE:-0 * * * *}
+      PORT: 3000
+    volumes:
+      - reporadar-lite-data:/app/data
+
+volumes:
+  reporadar-lite-data:

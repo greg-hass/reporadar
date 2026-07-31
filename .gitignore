@@ -13,3 +13,6 @@ vite.config.js
 
 # server compile output
 dist-server/
+
+# lite-mode runtime data
+data/

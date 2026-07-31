@@ -1,22 +1,27 @@
 # RepoRadar
 
-A GitHub discovery dashboard — search repos, browse new repos, and see **fast risers** computed from hourly star snapshots. Self-hosted as a single Docker container + Postgres.
+A GitHub discovery dashboard — search repos, browse new repos, and see **fast risers** computed from hourly star snapshots.
 
-## Quick start (Docker, one command)
+## Quick start (lite mode, no Postgres)
 
 ```bash
-# 1. Create your config
-cp .env.example .env
-# Edit .env and set GITHUB_SERVER_TOKEN (get one at https://github.com/settings/tokens)
-
-# 2. Build and run
-docker compose up -d --build
-
-# 3. Open the app
+docker compose -f docker-compose.lite.yml up -d --build
 open http://localhost:3000
 ```
 
-The database schema is applied automatically on startup (idempotent), so no manual migration step is needed. The first star snapshot runs automatically on startup, then hourly. Risers become meaningful after the job has run on at least two different hours.
+Lite mode needs no `.env`, GitHub token, or database. It stores favourites and snapshots in a local JSON volume. Anonymous GitHub API limits apply, and the local history disappears if that volume is deleted.
+
+## Quick start (durable mode)
+
+```bash
+cp .env.example .env
+# Set GITHUB_SERVER_TOKEN in .env
+
+docker compose up -d --build
+open http://localhost:3000
+```
+
+Durable mode uses Postgres and a server-side token for hourly tracking. The database schema is applied automatically on startup. Risers become meaningful after the tracker has run on at least two different hours.
 
 ## Updating (prebuilt image from GHCR)
 
@@ -51,28 +56,32 @@ Every list supports keyboard navigation: `j` / `k` to move, `↵` to open, `/` t
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │  Express server (Node, single container)     │
 │  • serves the built React frontend (dist/)   │
 │  • /api/search   → live GitHub Search API    │
-│  • /api/risers   → computed from Postgres    │
+│  • /api/risers   → computed from storage     │
 │  • /api/stats    → dashboard counters        │
 │  • /api/repos/:id/history → star snapshots   │
 │  • node-cron: hourly star-tracking job       │
 └───────────────────┬─────────────────────────┘
                     │
-┌───────────────────▼─────────────────────────┐
-│  Postgres 16 (separate container, volume)    │
-│  tables: repos, star_snapshots               │
-└─────────────────────────────────────────────┘
+       ┌────────────┴────────────┐
+       │                         │
+┌──────▼───────┐       ┌─────────▼──────────┐
+│ Postgres     │       │ Lite JSON storage  │
+│ durable mode │       │ zero-config mode   │
+└──────────────┘       └────────────────────┘
 ```
 
 ## Configuration (`.env`)
 
 | Variable | Required | Default | Purpose |
-|---|---|---|---|
-| `GITHUB_SERVER_TOKEN` | **yes** | — | Server-side GitHub API token (anonymous users share it, 5k req/hr) |
+| --- | --- | --- | --- |
+| `REPORADAR_MODE` | no | auto | `postgres` for durable history or `lite` for JSON storage |
+| `GITHUB_SERVER_TOKEN` | no in lite mode | — | Server-side GitHub token; anonymous API access works in lite mode |
+| `REPORADAR_DATA_DIR` | no | `./data` | JSON storage directory used by lite mode |
 | `POSTGRES_USER` | no | `postgres` | DB user (compose creates it) |
 | `POSTGRES_PASSWORD` | no | `postgres` | DB password |
 | `POSTGRES_DB` | no | `reporadar` | DB name |
@@ -86,11 +95,18 @@ npm install
 cp .env.example .env  # set GITHUB_SERVER_TOKEN + POSTGRES_URL
 npm run dev           # Vite dev server (frontend only, on :5173)
 npm run build         # build frontend
+npm run test          # run API, storage, and database unit tests
 npm run typecheck     # typecheck frontend
 npm run typecheck:api # typecheck API + server
 ```
 
-To run the server locally against a local/distant Postgres: `npx tsx server/index.ts`
+To run the server locally in lite mode: `REPORADAR_MODE=lite npm run server`.
+
+To run it against a local/distant Postgres: `POSTGRES_URL=postgres://... GITHUB_SERVER_TOKEN=... npm run server`.
+
+## GitGlance migration
+
+GitGlance has graduated into RepoRadar. RepoRadar is now the maintained product; GitGlance remains as a historical lightweight client-only version. New features and fixes belong here.
 
 ## Tech stack
 
