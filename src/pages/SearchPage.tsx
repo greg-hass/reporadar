@@ -71,7 +71,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
+    <div className="max-w-5xl mx-auto w-full min-w-0 flex flex-col gap-4">
       <div className="eyebrow">Query the archive</div>
       {/* key resets the input when the query changes from outside (e.g. example chips) */}
       <SearchBar key={q} initial={q} onSearch={(val) => patch({ q: val })} />
@@ -110,7 +110,7 @@ export default function SearchPage() {
             query={{ q, language, minStars, createdSinceDays, sort }}
             onApply={applySavedSearch}
           />
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <span className="eyebrow !text-[10px]">
               {isLoading
                 ? "Searching…"
@@ -118,7 +118,7 @@ export default function SearchPage() {
                   ? `Showing ${items.length} of ~${Math.min(total, 1000).toLocaleString()} results`
                   : ""}
             </span>
-            <div className="flex gap-2 items-center ml-auto">
+            <div className="flex min-w-0 gap-2 items-center ml-auto">
               <DensityToggle value={density} onChange={setDensity} />
               <SortControl value={sort} onChange={(s) => patch({ sort: s })} />
             </div>

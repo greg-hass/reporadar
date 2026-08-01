@@ -22,7 +22,7 @@
       (function () {
         try {
           var t = localStorage.getItem("reporadar-theme") || "aurora";
-          var attr = t === "gh-dark" || t === "tokyo-night" || t === "light" ? t : null;
+          var attr = t === "gh-dark" || t === "tokyo-night" || t === "midnight" || t === "dracula" || t === "nord" || t === "light" ? t : null;
           var el = document.documentElement;
           if (attr) el.setAttribute("data-theme", attr);
           if (attr !== "light") el.classList.add("dark");

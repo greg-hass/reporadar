@@ -17,7 +17,7 @@ export default function SavedSearches({ query, onApply }: { query: QueryState; o
   const isSaved = saved.some((item) => item.id === currentId);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
       <span className="eyebrow !text-[9px]">Saved research</span>
       {query.q && (
         <button

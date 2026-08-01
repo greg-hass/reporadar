@@ -14,12 +14,12 @@ const OPTIONS: { value: SortKey; label: string }[] = [
 
 export default function SortControl({ value, onChange }: Props) {
   return (
-    <span className="relative inline-block">
+    <span className="relative inline-block min-w-0 max-w-full">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as SortKey)}
         aria-label="Sort results"
-        className="select !py-1.5 text-[13px]"
+        className="select min-w-0 max-w-full !py-1.5 text-[13px]"
       >
         {OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>

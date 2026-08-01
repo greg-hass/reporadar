@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
-import { applyTheme, getStoredTheme, type ThemeName } from "../lib/theme";
+import { useToast } from "./Toast";
+import { THEME_OPTIONS } from "../lib/theme";
+import { useTheme } from "../hooks/useTheme";
 import { MoonIcon, SparklesIcon, StarIcon, SunIcon } from "./icons";
 
-const ORDER: ThemeName[] = ["aurora", "gh-dark", "tokyo-night", "light"];
-const LABEL: Record<ThemeName, string> = {
-  aurora: "Aurora",
-  "gh-dark": "GitHub Dark",
-  "tokyo-night": "Tokyo Night",
-  light: "Light",
-};
-const ICON = { aurora: SparklesIcon, "gh-dark": MoonIcon, "tokyo-night": StarIcon, light: SunIcon } as const;
+const ICON = {
+  aurora: SparklesIcon,
+  "gh-dark": MoonIcon,
+  "tokyo-night": StarIcon,
+  midnight: MoonIcon,
+  dracula: SparklesIcon,
+  nord: MoonIcon,
+  light: SunIcon,
+} as const;
 
 interface Props {
   /** "row" shows icon + label (sidebar); "icon" is a compact button (header). */
@@ -17,19 +19,19 @@ interface Props {
 }
 
 export default function ThemeToggle({ variant = "row" }: Props) {
-  const [theme, setTheme] = useState<ThemeName>(() => getStoredTheme());
-
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+  const { theme, setTheme } = useTheme();
+  const toast = useToast();
+  const current = THEME_OPTIONS.find((option) => option.id === theme) ?? THEME_OPTIONS[0];
 
   const next = () => {
-    const i = ORDER.indexOf(theme);
-    setTheme(ORDER[(i + 1) % ORDER.length]);
+    const i = THEME_OPTIONS.findIndex((option) => option.id === theme);
+    const nextTheme = THEME_OPTIONS[(i + 1) % THEME_OPTIONS.length];
+    setTheme(nextTheme.id);
+    toast.show(`${nextTheme.label} theme selected`);
   };
 
   const Icon = ICON[theme];
-  const label = `Theme: ${LABEL[theme]} — click to switch`;
+  const label = `Theme: ${current.label} — click to switch`;
 
   if (variant === "icon") {
     return (
@@ -52,7 +54,7 @@ export default function ThemeToggle({ variant = "row" }: Props) {
       className="flex items-center gap-2.5 w-full rounded-lg px-3 py-2 text-sm text-muted hover:text-text hover:bg-surface transition-colors"
     >
       <Icon size={16} />
-      {LABEL[theme]}
+      {current.label}
     </button>
   );
 }

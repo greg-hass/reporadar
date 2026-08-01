@@ -12,6 +12,7 @@ import ComparePage from "./pages/ComparePage";
 import CompareBar from "./components/CompareBar";
 import { CompareProvider } from "./hooks/useCompare";
 import InstallPrompt from "./components/InstallPrompt";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
                   <Route path="/risers" element={<Navigate to="/" replace />} />
                   <Route path="/favourites" element={<FavouritesPage />} />
                   <Route path="/compare" element={<ComparePage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/repo/:owner/:name" element={<RepoDetailPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

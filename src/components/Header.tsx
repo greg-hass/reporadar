@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { NAV_TABS } from "./nav";
 import { Logo } from "./icons";
 import ThemeToggle from "./ThemeToggle";
+import { SettingsIcon } from "./icons";
 
 /** Sticky top bar for tablets and phones (hidden on desktop). */
 export default function Header() {
@@ -30,7 +31,15 @@ export default function Header() {
             </NavLink>
           ))}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <NavLink
+            to="/settings"
+            aria-label="Open settings"
+            title="Settings"
+            className={({ isActive }) => `flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${isActive ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted hover:border-primary/50 hover:text-text"}`}
+          >
+            <SettingsIcon size={17} />
+          </NavLink>
           <ThemeToggle variant="icon" />
         </div>
       </div>

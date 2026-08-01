@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { NAV_TABS } from "./nav";
-import { Logo } from "./icons";
+import { Logo, SettingsIcon } from "./icons";
 import ThemeToggle from "./ThemeToggle";
 import { useStats } from "../hooks/useStats";
 import { relativeTime } from "../lib/format";
@@ -64,6 +64,10 @@ export default function Sidebar() {
             )}
           </div>
         </div>
+        <NavLink to="/settings" className={({ isActive }) => `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${isActive ? "bg-primary/10 font-semibold text-primary" : "text-muted hover:bg-surface hover:text-text"}`}>
+          <SettingsIcon size={16} />
+          Settings
+        </NavLink>
         <ThemeToggle variant="row" />
       </div>
     </aside>
