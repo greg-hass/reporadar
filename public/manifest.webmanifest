@@ -1,10 +1,14 @@
 {
   "name": "RepoRadar",
   "short_name": "RepoRadar",
+  "id": "/",
   "description": "GitHub discovery dashboard — track fast-rising repos from hourly star snapshots.",
+  "lang": "en-GB",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
+  "orientation": "portrait",
   "background_color": "#0b0c1d",
   "theme_color": "#0b0c1d",
   "icons": [

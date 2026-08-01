@@ -15,7 +15,7 @@ vi.mock("pg", () => ({
 	types: { builtins: { INT8: 20 }, setTypeParser: vi.fn() },
 }));
 
-import { queryRepoByName, upsertAndSnapshot } from "./db";
+import { queryRepoByName, queryRisers, upsertAndSnapshot } from "./db";
 import type { NormalizedRepo } from "./github";
 
 const repo: NormalizedRepo = {
@@ -70,5 +70,34 @@ describe("Postgres storage", () => {
 		expect(found?.fullName).toBe("greg-hass/reporadar");
 		expect(poolQuery).toHaveBeenCalledOnce();
 		expect(poolConnect).not.toHaveBeenCalled();
+	});
+
+	it("keeps every repo in Trending when batches are snapshotted separately", async () => {
+		poolQuery
+			.mockResolvedValueOnce({
+				rows: [{ ...repo, delta: 3 }],
+			})
+			.mockResolvedValueOnce({
+				rows: [{ repo_id: repo.id, pts: [12, 15] }],
+			})
+			.mockResolvedValueOnce({ rows: [{ n: 2 }] });
+
+		const result = await queryRisers(
+			"postgres://postgres:postgres@db:5432/reporadar",
+			7,
+			50,
+		);
+
+		expect(result.total).toBe(2);
+		expect(result.items[0]).toMatchObject({
+			id: repo.id,
+			starDelta: 3,
+			history: [12, 15],
+		});
+		const risersSql = String(poolQuery.mock.calls[0]?.[0]).replace(/\s+/g, " ");
+		expect(risersSql).toContain("DISTINCT ON (repo_id)");
+		expect(risersSql).toContain("ORDER BY repo_id, captured_at DESC");
+		expect(risersSql).not.toContain("captured_at = (SELECT MAX(captured_at)");
+		expect(String(poolQuery.mock.calls[2]?.[0])).toContain("COUNT(DISTINCT repo_id)");
 	});
 });

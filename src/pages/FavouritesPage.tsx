@@ -11,6 +11,8 @@ import { useFavourites } from "../hooks/useFavourites";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 import { safeExternalUrl } from "../lib/format";
+import WatchlistAlerts from "../components/WatchlistAlerts";
+import WatchlistTools from "../components/WatchlistTools";
 
 type Window = "1d" | "7d" | "30d";
 const WINDOW_OPTIONS: { value: Window; label: string }[] = [
@@ -46,8 +48,8 @@ export default function FavouritesPage() {
           </div>
           <div>
             <div className="eyebrow !text-[9px]">Pinned signals</div>
-            <h1 className="text-lg font-bold leading-tight mt-0.5">Favourites</h1>
-            <p className="text-xs text-muted">Your repos, snapshotted hourly by the tracking job</p>
+            <h1 className="text-lg font-bold leading-tight mt-0.5">Watchlist</h1>
+            <p className="text-xs text-muted">Repos you are watching, snapshotted hourly</p>
           </div>
         </div>
         <div className="flex gap-2 items-center ml-auto">
@@ -68,6 +70,8 @@ export default function FavouritesPage() {
         />
       ) : (
         <>
+          <WatchlistAlerts items={items} window={win} />
+          <WatchlistTools items={items} />
           <div className="flex flex-col gap-2.5">
             {items.map((repo, i) =>
               density === "compact" ? (

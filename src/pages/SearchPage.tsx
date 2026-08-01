@@ -13,6 +13,8 @@ import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 import { safeExternalUrl } from "../lib/format";
 import type { Repo, SortKey } from "../lib/types";
+import SavedSearches from "../components/SavedSearches";
+import type { SavedSearch } from "../hooks/useSavedSearches";
 
 const EXAMPLES = ["terminal emulator", "llm agent framework", "self-hosted dashboard"];
 
@@ -58,6 +60,16 @@ export default function SearchPage() {
     setSp(next);
   };
 
+  const applySavedSearch = (search: SavedSearch) => {
+    patch({
+      q: search.q,
+      language: search.language,
+      minStars: search.minStars,
+      createdSinceDays: search.createdSinceDays,
+      sort: search.sort,
+    });
+  };
+
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
       <div className="eyebrow">Query the archive</div>
@@ -93,6 +105,10 @@ export default function SearchPage() {
             minStars={minStars}
             createdSinceDays={createdSinceDays}
             onChange={patch}
+          />
+          <SavedSearches
+            query={{ q, language, minStars, createdSinceDays, sort }}
+            onApply={applySavedSearch}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="eyebrow !text-[10px]">

@@ -136,9 +136,12 @@ export async function queryRisers(
 	// pi-lens-ignore: no-sql-in-code
 	const res = await pool.query(
 		`WITH latest AS (
-         SELECT repo_id, stars, captured_at
+         -- The tracker writes general candidates and favourites in separate
+         -- transactions. Pick the newest snapshot for each repo instead of
+         -- treating the later batch as the only global "latest" snapshot.
+         SELECT DISTINCT ON (repo_id) repo_id, stars, captured_at
          FROM star_snapshots
-         WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)
+         ORDER BY repo_id, captured_at DESC
        ),
        past AS (
          SELECT DISTINCT ON (repo_id) repo_id, stars AS past_stars
@@ -175,8 +178,7 @@ export async function queryRisers(
 	}
 	// pi-lens-ignore: no-sql-in-code
 	const countRes = await pool.query(
-		`SELECT COUNT(*)::int AS n FROM star_snapshots
-       WHERE captured_at = (SELECT MAX(captured_at) FROM star_snapshots)`,
+		`SELECT COUNT(DISTINCT repo_id)::int AS n FROM star_snapshots`,
 	);
 	return {
 		items: rows.map((r) => ({

@@ -11,7 +11,9 @@ import { useRepo } from "../hooks/useRepo";
 import { useHistory } from "../hooks/useHistory";
 import { useReadme } from "../hooks/useReadme";
 import { useFavouriteIds, useToggleFavourite } from "../hooks/useFavourites";
-import { compactNumber, safeExternalUrl } from "../lib/format";
+import { compactNumber, relativeTime, safeExternalUrl } from "../lib/format";
+import CompareButton from "../components/CompareButton";
+import RelatedRepos from "../components/RelatedRepos";
 
 type Days = "7" | "30" | "90";
 const DAYS_OPTIONS: { value: Days; label: string }[] = [
@@ -83,12 +85,13 @@ export default function RepoDetailPage() {
     ? (new Date(points[points.length - 1].t).getTime() - new Date(points[0].t).getTime()) / 86_400_000
     : 0;
   const windowLimited = tracked && spanDays + 0.5 < Number(days);
+  const trendDelta = tracked ? points[points.length - 1].stars - points[0].stars : null;
   const fmtDay = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
-      <button
+                <button
         onClick={() => navigate(-1)}
         className="sticky top-3 z-30 self-start rounded-full bg-surface/80 backdrop-blur px-3.5 py-1.5 text-xs text-muted hover:text-text transition-colors"
       >
@@ -113,19 +116,19 @@ export default function RepoDetailPage() {
         />
       ) : (
         <>
-          <div className="panel p-5 sm:p-6 animate-fade-up">
-            <div className="flex flex-wrap items-start gap-4">
-              <img src={repo.ownerAvatar} alt="" className="w-14 h-14 rounded-xl ring-1 ring-border" />
-              <div className="flex-1 min-w-0">
-                <h1 className="font-display text-xl font-extrabold tracking-tight break-all">{repo.fullName}</h1>
-                {repo.description && (
-                  <p className="text-muted text-sm mt-1 leading-relaxed">{repo.description}</p>
-                )}
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={() => toggle.mutate({ repo, fav: isFav })}
-                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+			<div className="panel p-5 sm:p-6 animate-fade-up">
+				<div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-4 sm:flex sm:flex-wrap sm:gap-4">
+					<img src={repo.ownerAvatar} alt="" className="w-14 h-14 rounded-xl ring-1 ring-border" />
+					<div className="flex-1 min-w-0">
+						<h1 className="font-display text-lg sm:text-xl font-extrabold tracking-tight break-words">{repo.fullName}</h1>
+						{repo.description && (
+							<p className="text-muted text-sm mt-1 leading-relaxed">{repo.description}</p>
+						)}
+					</div>
+					<div className="col-span-2 flex w-full gap-2 sm:ml-auto sm:w-auto">
+						<button
+							onClick={() => toggle.mutate({ repo, fav: isFav })}
+							className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors sm:flex-none ${
                     isFav
                       ? "border-accent/50 text-accent bg-accent/10"
                       : "border-border text-muted hover:text-text hover:border-primary/50"
@@ -134,11 +137,12 @@ export default function RepoDetailPage() {
                   <StarIcon size={14} fill={isFav ? "currentColor" : "none"} />
                   {isFav ? "Favourited" : "Favourite"}
                 </button>
+                <CompareButton repo={repo} label />
                 <a
                   href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary flex items-center gap-1.5 px-3.5 py-2 text-xs"
+							 target="_blank"
+							rel="noreferrer"
+							className="btn-primary flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3.5 py-2 text-xs sm:flex-none"
                 >
                   <ExternalLinkIcon size={13} />
                   Open on GitHub
@@ -176,6 +180,42 @@ export default function RepoDetailPage() {
               </div>
             )}
           </div>
+
+          <section className="panel p-4 sm:p-5 animate-fade-up" aria-labelledby="signal-brief-heading">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="eyebrow !text-[9px]">Decision brief</span>
+                <h2 id="signal-brief-heading" className="font-semibold text-sm mt-1">Why look now?</h2>
+              </div>
+              <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${trendDelta && trendDelta > 0 ? "bg-success/15 text-success" : "bg-elevated text-muted"}`}>
+                {trendDelta && trendDelta > 0 ? "Gaining attention" : "Worth a closer look"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 mt-4 sm:grid-cols-4">
+              <div className="rounded-xl bg-elevated/60 p-3">
+                <div className="eyebrow !text-[8px]">Momentum</div>
+                <div className="font-mono text-sm font-bold mt-1.5 text-success">
+                  {trendDelta == null ? "New" : `${trendDelta >= 0 ? "+" : ""}${trendDelta.toLocaleString()}`}
+                </div>
+                <div className="text-[10px] text-muted mt-0.5">stars / {days}d</div>
+              </div>
+              <div className="rounded-xl bg-elevated/60 p-3">
+                <div className="eyebrow !text-[8px]">Evidence</div>
+                <div className="font-mono text-sm font-bold mt-1.5">{points.length}</div>
+                <div className="text-[10px] text-muted mt-0.5">snapshots</div>
+              </div>
+              <div className="rounded-xl bg-elevated/60 p-3">
+                <div className="eyebrow !text-[8px]">Activity</div>
+                <div className="font-mono text-sm font-bold mt-1.5">{relativeTime(repo.pushedAt)}</div>
+                <div className="text-[10px] text-muted mt-0.5">last pushed</div>
+              </div>
+              <div className="rounded-xl bg-elevated/60 p-3">
+                <div className="eyebrow !text-[8px]">Status</div>
+                <div className="font-mono text-sm font-bold mt-1.5">{isFav ? "Watching" : "Discover"}</div>
+                <div className="text-[10px] text-muted mt-0.5">{tracked ? `${Math.max(1, Math.round(spanDays))}d coverage` : "not tracked"}</div>
+              </div>
+            </div>
+          </section>
 
           <div className="panel p-5 sm:p-6 animate-fade-up">
             <div className="flex flex-wrap items-center gap-3">
@@ -257,6 +297,7 @@ export default function RepoDetailPage() {
               <p className="text-muted text-sm mt-3">No README available for this repository.</p>
             )}
           </div>
+          <RelatedRepos repo={repo} />
         </>
       )}
     </div>

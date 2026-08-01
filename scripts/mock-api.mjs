@@ -59,13 +59,15 @@ const synth = (page, i) => ({
 
 app.get("/api/risers", (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
+  const allRisers = [
+    ...REPOS.map((r) => toRepo(r, true)),
+    ...Array.from({ length: 30 }, (_, i) => toRepo(synth(2, i), true)),
+  ];
+  const pageSize = 50;
+  const start = (page - 1) * pageSize;
   const items =
-    page === 1
-      ? REPOS.map((r) => toRepo(r, true))
-      : page === 2
-        ? Array.from({ length: 30 }, (_, i) => toRepo(synth(page, i), true))
-        : [];
-  res.json({ items, total: items.length });
+    allRisers.slice(start, start + pageSize);
+  res.json({ items, total: allRisers.length });
 });
 
 app.get("/api/search", (req, res) => {

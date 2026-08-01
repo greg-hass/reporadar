@@ -33,7 +33,7 @@ export default function NewPage() {
   const [days, setDays] = useState<Days>("7");
   const [density, setDensity] = useDensity();
   const { data, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = useSearch(
-    { q: "stars:>1", createdSinceDays: Number(days), sort: "updated" },
+    { q: "stars:>1", createdSinceDays: Number(days), sort: "stars" },
     true
   );
 
@@ -58,8 +58,8 @@ export default function NewPage() {
           </div>
           <div>
             <div className="eyebrow !text-[9px]">Fresh signals</div>
-            <h1 className="font-display text-lg font-bold leading-tight mt-0.5">Fresh repos</h1>
-            <p className="text-xs text-muted">Freshly created and already gaining stars</p>
+            <h1 className="font-display text-lg font-bold leading-tight mt-0.5">New &amp; rising</h1>
+            <p className="text-xs text-muted">Recently created repos with early momentum</p>
           </div>
         </div>
         <div className="flex gap-2 items-center ml-auto">

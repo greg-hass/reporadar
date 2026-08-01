@@ -295,6 +295,24 @@ body::before {
       padding-right: 20px;
     }
   }
+  .panel-row-rich {
+    align-items: flex-start;
+  }
+  .repo-name-rich {
+    overflow-wrap: anywhere;
+  }
+  .repo-description-rich {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  @media (max-width: 639px) {
+    .panel-row-rich {
+      padding-top: 16px;
+      padding-bottom: 16px;
+    }
+  }
   .panel-row:hover {
     background-color: color-mix(in srgb, var(--color-elevated) 55%, transparent);
     transform: translateY(-1px);

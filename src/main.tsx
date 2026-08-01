@@ -17,3 +17,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+// Safari uses the Apple metadata below for Add to Home Screen, while a
+// service worker makes the installed shell resilient when the connection
+// drops. Keep development uncached so local UI work always reflects the
+// current source.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js");
+  });
+}

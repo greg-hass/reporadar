@@ -18,7 +18,7 @@ export default function MobileNav() {
             }
           >
             <t.icon size={20} />
-            {t.label}
+            {t.mobileLabel ?? t.label}
           </NavLink>
         ))}
       </div>

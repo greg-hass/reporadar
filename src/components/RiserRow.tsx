@@ -7,6 +7,7 @@ import Rank from "./Rank";
 import FavButton from "./FavButton";
 import { ExternalLinkIcon } from "./icons";
 import { safeExternalUrl } from "../lib/format";
+import CompareButton from "./CompareButton";
 
 interface Props {
   repo: Repo;
@@ -35,7 +36,7 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
     <div
       ref={ref}
       onClick={() => navigate(detailUrl)}
-      className={`panel panel-row cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      className={`panel panel-row panel-row-rich cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       <Rank n={rank} />
@@ -43,20 +44,21 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
       <img
         src={repo.ownerAvatar}
         alt=""
-        className="w-9 h-9 rounded-lg ring-1 ring-border shrink-0"
+        className="w-11 h-11 rounded-xl ring-1 ring-border shrink-0"
         loading="lazy"
       />
 
       <div className="flex-1 min-w-0">
-        <span className="flex items-center gap-1.5 min-w-0">
+        <span className="flex items-start gap-1.5 min-w-0">
           <Link
             to={detailUrl}
             onClick={(e) => e.stopPropagation()}
-            className="font-semibold text-[15px] text-text hover:text-primary transition-colors truncate"
+            className="repo-name-rich min-w-0 line-clamp-2 font-semibold text-base leading-snug text-text hover:text-primary transition-colors"
           >
             {repo.fullName}
           </Link>
           <FavButton repo={repo} size={13} />
+          <CompareButton repo={repo} />
           <a
             href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
             target="_blank"
@@ -70,9 +72,9 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
           </a>
         </span>
         {repo.description && (
-          <p className="hidden sm:block text-muted text-xs truncate mt-0.5">{repo.description}</p>
+          <p className="repo-description-rich text-muted text-[13px] leading-relaxed mt-1.5">{repo.description}</p>
         )}
-        <span className="flex items-center text-[11px] text-muted mt-1">
+        <span className="flex items-center text-xs text-muted mt-1.5">
           <LanguageDot language={repo.language} />
           {repo.language ?? "—"}
         </span>
@@ -90,13 +92,18 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
       )}
 
       <div className="text-right shrink-0 pl-1 sm:pl-3">
-        <div className="font-mono tabular-nums text-xl sm:text-2xl font-bold text-success leading-none">
+        <div className="font-mono tabular-nums text-lg sm:text-2xl font-bold text-success leading-none">
           +{perDay.toLocaleString()}
         </div>
         <div className="text-[9px] uppercase tracking-wider text-muted mt-1">stars / day</div>
         <div className="font-mono tabular-nums text-[10px] text-muted mt-1">
           +{delta.toLocaleString()} · {window}
         </div>
+        {history && history.length > 1 && (
+          <div className="hidden sm:block text-[9px] uppercase tracking-wider text-muted mt-1">
+            {history.length} snapshots
+          </div>
+        )}
       </div>
     </div>
   );

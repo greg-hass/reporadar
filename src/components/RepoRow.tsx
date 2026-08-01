@@ -6,6 +6,7 @@ import { ExternalLinkIcon, ForkIcon, StarIcon } from "./icons";
 import LanguageDot from "./LanguageDot";
 import Rank from "./Rank";
 import FavButton from "./FavButton";
+import CompareButton from "./CompareButton";
 
 interface Props {
   repo: Repo;
@@ -23,30 +24,36 @@ interface Props {
 export default function RepoRow({ repo, rank, selected, compact, stagger = 0, right }: Props) {
   const navigate = useNavigate();
   const detailUrl = `/repo/${repo.fullName}`;
+  const rich = !compact;
 
   return (
     <div
       onClick={() => navigate(detailUrl)}
-      className={`panel panel-row cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      className={`panel panel-row ${rich ? "panel-row-rich" : ""} cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       {rank !== undefined && <Rank n={rank} />}
       <img
         src={repo.ownerAvatar}
         alt=""
-        className="w-8 h-8 rounded-lg ring-1 ring-border shrink-0"
+        className={`${rich ? "w-11 h-11 rounded-xl" : "w-8 h-8 rounded-lg"} ring-1 ring-border shrink-0`}
         loading="lazy"
       />
       <div className="flex-1 min-w-0">
-        <span className="flex items-center gap-1.5 min-w-0">
+        <span className={`flex gap-1.5 min-w-0 ${rich ? "items-start" : "items-center"}`}>
           <Link
             to={detailUrl}
             onClick={(e) => e.stopPropagation()}
-            className="font-semibold text-[15px] text-text hover:text-primary transition-colors truncate"
+            className={`min-w-0 font-semibold text-text hover:text-primary transition-colors ${
+              rich
+                ? "repo-name-rich line-clamp-2 text-base leading-snug"
+                : "truncate text-[15px]"
+            }`}
           >
             {repo.fullName}
           </Link>
           <FavButton repo={repo} size={13} />
+          <CompareButton repo={repo} />
           <a
             href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
             target="_blank"
@@ -60,10 +67,10 @@ export default function RepoRow({ repo, rank, selected, compact, stagger = 0, ri
           </a>
         </span>
         {!compact && repo.description && (
-          <p className="hidden sm:block text-muted text-xs truncate mt-0.5">{repo.description}</p>
+          <p className="repo-description-rich text-muted text-[13px] leading-relaxed mt-1.5">{repo.description}</p>
         )}
         {!compact && (
-          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 mt-1 text-[11px] text-muted">
+          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 mt-1.5 text-xs text-muted">
             <span className="flex items-center">
               <LanguageDot language={repo.language} />
               {repo.language ?? "—"}

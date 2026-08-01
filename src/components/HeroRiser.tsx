@@ -25,9 +25,9 @@ export default function HeroRiser({ repo, windowDays }: { repo: Repo; windowDays
       <div className="flex items-center gap-3.5 mt-4">
         <img src={repo.ownerAvatar} alt="" className="w-11 h-11 rounded-xl ring-1 ring-border" loading="lazy" />
         <div className="min-w-0">
-          <div className="font-bold text-lg truncate">{repo.fullName}</div>
+          <div className="repo-name-rich line-clamp-2 font-bold text-lg leading-snug">{repo.fullName}</div>
           {repo.description && (
-            <p className="text-muted text-xs truncate mt-0.5">{repo.description}</p>
+            <p className="repo-description-rich text-muted text-[13px] leading-relaxed mt-1">{repo.description}</p>
           )}
         </div>
       </div>
@@ -38,6 +38,9 @@ export default function HeroRiser({ repo, windowDays }: { repo: Repo; windowDays
           </div>
           <div className="text-[10px] uppercase tracking-wider text-muted mt-1.5">
             stars / day · +{delta.toLocaleString()} in {windowDays}d
+          </div>
+          <div className="text-[10px] text-muted mt-1">
+            {history && history.length > 1 ? `${history.length} snapshots · tracking confidence` : "New signal · snapshotting now"}
           </div>
         </div>
         {history && history.length > 1 && (

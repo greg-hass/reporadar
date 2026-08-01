@@ -84,6 +84,13 @@ export const AlertCircleIcon = make(
   </>
 );
 
+export const BellIcon = make(
+  <>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+    <path d="M10 21h4" />
+  </>
+);
+
 export const InboxIcon = make(
   <>
     <path d="M22 12h-6l-2 3h-4l-2-3H2" />
@@ -99,6 +106,15 @@ export const CopyIcon = make(
 );
 
 export const CheckIcon = make(<path d="M20 6 9 17l-5-5" />);
+
+export const CompareIcon = make(
+  <>
+    <rect x="3" y="5" width="8" height="14" rx="1.5" />
+    <rect x="13" y="5" width="8" height="14" rx="1.5" />
+  </>
+);
+
+export const XIcon = make(<path d="m6 6 12 12M18 6 6 18" />);
 
 export function Logo({ size = 26 }: { size?: number }) {
   return (

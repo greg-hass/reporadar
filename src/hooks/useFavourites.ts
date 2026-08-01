@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteFavourite, fetchFavouriteIds, fetchFavourites, putFavourite } from "../lib/api";
 import type { Repo } from "../lib/types";
+import { useToast } from "../components/Toast";
 
 type Window = "1d" | "7d" | "30d";
 
@@ -17,6 +18,7 @@ export function useFavourites(window: Window) {
 
 export function useToggleFavourite() {
   const qc = useQueryClient();
+  const toast = useToast();
   return useMutation({
     mutationFn: ({ repo, fav }: { repo: Repo; fav: boolean }) =>
       fav ? deleteFavourite(repo.id) : putFavourite(repo),
@@ -32,6 +34,14 @@ export function useToggleFavourite() {
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(["favourite-ids"], ctx.prev);
+      toast.show("Couldn't update your watchlist. Try again.");
+    },
+    onSuccess: (_result, { repo, fav }) => {
+      toast.show(
+        fav
+          ? `${repo.fullName} removed from your watchlist.`
+          : `${repo.fullName} added. Tracking starts with the next snapshot.`,
+      );
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["favourite-ids"] });
