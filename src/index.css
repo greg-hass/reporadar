@@ -91,7 +91,9 @@ html {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   max-width: 100%;
+  /* Keep horizontal overflow clipped without creating a nested vertical scroller. */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -99,12 +101,14 @@ body {
   color: var(--color-text);
   max-width: 100%;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 #root {
   min-width: 0;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Ambient brand glow; nearly invisible in light theme, part of the Aurora look in dark themes. */
