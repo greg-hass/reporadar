@@ -62,7 +62,7 @@ export default function NewPage() {
             <p className="text-xs text-muted">Recently created repos with early momentum</p>
           </div>
         </div>
-        <div className="flex gap-2 items-center ml-auto">
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
           <SegmentedControl value={days} options={DAYS_OPTIONS} onChange={changeDays} ariaLabel="Created within" />
           <DensityToggle value={density} onChange={setDensity} />
         </div>

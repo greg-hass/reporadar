@@ -54,23 +54,17 @@ export default function WatchlistTools({ items }: { items: Repo[] }) {
   };
 
   return (
-    <div className="panel flex flex-wrap items-center gap-3 p-3.5">
-      <div className="min-w-0 flex-1">
-        <div className="eyebrow !text-[9px]">Your data</div>
-        <p className="text-xs text-muted mt-0.5">Keep your watchlist portable across devices.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={exportWatchlist} className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-muted hover:text-text hover:border-primary/50">
-          <CopyIcon size={13} /> Export
-        </button>
-        <input ref={inputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void importWatchlist(file);
-        }} />
-        <button type="button" disabled={importing} onClick={() => inputRef.current?.click()} className="btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
-          <CheckIcon size={13} /> {importing ? "Importing…" : "Import"}
-        </button>
-      </div>
+    <div className="flex items-center justify-end gap-2 px-1">
+      <button type="button" onClick={exportWatchlist} className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-muted hover:border-primary/50 hover:text-text">
+        <CopyIcon size={13} /> Export
+      </button>
+      <input ref={inputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file) void importWatchlist(file);
+      }} />
+      <button type="button" disabled={importing} onClick={() => inputRef.current?.click()} className="btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
+        <CheckIcon size={13} /> {importing ? "Importing…" : "Import"}
+      </button>
     </div>
   );
 }

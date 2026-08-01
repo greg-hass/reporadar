@@ -11,14 +11,14 @@ export default function SegmentedControl<T extends string>({ value, options, onC
     <div
       role="group"
       aria-label={ariaLabel}
-      className="flex rounded-lg border border-border bg-bg p-0.5 text-xs"
+      className="flex w-full min-w-0 rounded-lg border border-border bg-bg p-0.5 text-xs sm:w-auto"
     >
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           aria-pressed={value === o.value}
-          className={`px-3 py-1.5 min-h-[32px] rounded-md whitespace-nowrap transition-colors ${
+          className={`min-w-0 flex-1 px-3 py-1.5 min-h-[32px] rounded-md whitespace-nowrap transition-colors sm:flex-none ${
             value === o.value ? "bg-primary text-white font-semibold" : "text-muted hover:text-text"
           }`}
         >

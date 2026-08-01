@@ -220,7 +220,7 @@ export default function RepoDetailPage() {
           <div className="panel p-5 sm:p-6 animate-fade-up">
             <div className="flex flex-wrap items-center gap-3">
               <span className="eyebrow !text-[9px]">Star history</span>
-              <div className="ml-auto">
+              <div className="w-full sm:ml-auto sm:w-auto">
                 <SegmentedControl value={days} options={DAYS_OPTIONS} onChange={setDays} ariaLabel="History window" />
               </div>
             </div>

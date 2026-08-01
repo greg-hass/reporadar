@@ -6,7 +6,6 @@ import HeroRiser from "../components/HeroRiser";
 import DensityToggle from "../components/DensityToggle";
 import SegmentedControl from "../components/SegmentedControl";
 import RepoListSkeleton from "../components/Skeleton";
-import StatsBand from "../components/StatsBand";
 import LoadMore from "../components/LoadMore";
 import { EmptyState, ErrorState } from "../components/States";
 import { useRisers } from "../hooks/useRisers";
@@ -65,14 +64,12 @@ export default function RisersPage() {
             {scope === "global" ? "Fast risers from the tracked GitHub discovery set" : "The repos you are watching, ranked by momentum"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 items-center ml-auto">
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
           <SegmentedControl value={scope} options={SCOPE_OPTIONS} onChange={setScope} ariaLabel="Trending scope" />
           <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
           <DensityToggle value={density} onChange={setDensity} />
         </div>
       </div>
-
-      <StatsBand compactOnMobile />
 
       {active.isLoading ? (
         <RepoListSkeleton />

@@ -70,17 +70,6 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <section aria-labelledby="install-heading">
-        <div className="mb-2 px-1">
-          <span className="eyebrow !text-[9px]" id="install-heading">Install &amp; return</span>
-        </div>
-        <div className="panel p-4 sm:p-5">
-          <div className="text-sm font-semibold">Keep RepoRadar one tap away</div>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            On iPhone, use Safari’s Share menu and choose <strong className="text-text">Add to Home Screen</strong> for a full-screen RepoRadar app.
-          </p>
-        </div>
-      </section>
     </div>
   );
 }

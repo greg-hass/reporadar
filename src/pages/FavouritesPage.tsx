@@ -52,7 +52,7 @@ export default function FavouritesPage() {
             <p className="text-xs text-muted">Repos you are watching, snapshotted hourly</p>
           </div>
         </div>
-        <div className="flex gap-2 items-center ml-auto">
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
           <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
           <DensityToggle value={density} onChange={setDensity} />
         </div>
