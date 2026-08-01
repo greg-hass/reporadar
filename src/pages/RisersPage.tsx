@@ -14,9 +14,11 @@ import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 import { safeExternalUrl } from "../lib/format";
 import { Link } from "react-router-dom";
+import PageHeader from "../components/PageHeader";
+import { TrendingUpIcon } from "../components/icons";
 
 type Window = "1d" | "7d" | "30d";
-type Scope = "global" | "following";
+type Scope = "global" | "watchlist";
 const WINDOW_OPTIONS: { value: Window; label: string }[] = [
   { value: "1d", label: "24h" },
   { value: "7d", label: "7 days" },
@@ -25,7 +27,7 @@ const WINDOW_OPTIONS: { value: Window; label: string }[] = [
 const WINDOW_DAYS: Record<Window, number> = { "1d": 1, "7d": 7, "30d": 30 };
 const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
   { value: "global", label: "Global GitHub" },
-  { value: "following", label: "Following" },
+  { value: "watchlist", label: "Watchlist" },
 ];
 
 export default function RisersPage() {
@@ -33,11 +35,11 @@ export default function RisersPage() {
   const [scope, setScope] = useState<Scope>("global");
   const [density, setDensity] = useDensity();
   const global = useRisers(win);
-  const following = useFavourites(win);
-  const active = scope === "global" ? global : following;
+  const watchlist = useFavourites(win);
+  const active = scope === "global" ? global : watchlist;
 
-  const items = scope === "global" ? global.data?.pages.flatMap((p) => p.items) ?? [] : following.data?.items ?? [];
-  const total = scope === "global" ? global.data?.pages[0]?.total : following.data?.total;
+  const items = scope === "global" ? global.data?.pages.flatMap((p) => p.items) ?? [] : watchlist.data?.items ?? [];
+  const total = scope === "global" ? global.data?.pages[0]?.total : watchlist.data?.total;
   // #1 gets the hero spotlight; the list starts at #2 and paginates from there.
   const hero = items[0];
   const rest = items.slice(1);
@@ -56,20 +58,27 @@ export default function RisersPage() {
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
       <div className="radar-bg" aria-hidden="true" />
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0">
-          <div className="eyebrow">{scope === "global" ? "Global GitHub signals" : "Your watchlist signals"} · last {win}</div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight mt-1">Trending</h1>
-          <p className="text-xs text-muted mt-1">
-            {scope === "global" ? "Fast risers from the tracked GitHub discovery set" : "The repos you are watching, ranked by momentum"}
-          </p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
-          <SegmentedControl value={scope} options={SCOPE_OPTIONS} onChange={setScope} ariaLabel="Trending scope" />
-          <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
-          <DensityToggle value={density} onChange={setDensity} />
-        </div>
-      </div>
+      <PageHeader
+        icon={TrendingUpIcon}
+        eyebrow={`${scope === "global" ? "Global GitHub signals" : "Watchlist signals"} · last ${win}`}
+        title="Trending"
+        description={scope === "global" ? "Fast risers from the tracked GitHub discovery set" : "Repos on your watchlist, ranked by momentum"}
+        actions={(
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="w-full sm:w-auto">
+              <SegmentedControl value={scope} options={SCOPE_OPTIONS} onChange={setScope} ariaLabel="Trending scope" />
+            </div>
+            <div className="flex w-full min-w-0 gap-2 sm:w-auto">
+              <div className="min-w-0 flex-[1.65] sm:flex-none">
+                <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
+              </div>
+              <div className="min-w-0 flex-1 sm:flex-none">
+                <DensityToggle value={density} onChange={setDensity} />
+              </div>
+            </div>
+          </div>
+        )}
+      />
 
       {active.isLoading ? (
         <RepoListSkeleton />
@@ -77,12 +86,12 @@ export default function RisersPage() {
         <ErrorState message={(active.error as Error).message} onRetry={() => active.refetch()} />
       ) : !hero ? (
         <EmptyState
-          title={scope === "following" ? "Your watchlist is empty" : "No risers yet"}
-          hint={scope === "following"
+          title={scope === "watchlist" ? "Your watchlist is empty" : "No risers yet"}
+          hint={scope === "watchlist"
             ? "Add repos to your watchlist and come back here to see their momentum side by side."
             : "Risers appear after the hourly snapshot job has run at least twice."}
         >
-          {scope === "following" && (
+          {scope === "watchlist" && (
             <Link to="/search" className="btn-primary px-4 py-2 text-xs mt-4">
               Find repos to watch
             </Link>
@@ -93,7 +102,7 @@ export default function RisersPage() {
           <HeroRiser repo={hero} windowDays={WINDOW_DAYS[win]} />
           {total !== undefined && (
             <p className="text-[11px] text-muted px-1">
-              Showing {items.length} of {total.toLocaleString()} {scope === "global" ? "tracked repos" : "watched repos"}
+              Showing {items.length} of {total.toLocaleString()} {scope === "global" ? "tracked repos" : "watchlist repos"}
             </p>
           )}
           {rest.length > 0 && (

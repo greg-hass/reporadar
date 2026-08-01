@@ -13,6 +13,7 @@ import { useRovingKeys } from "../hooks/useRovingKeys";
 import { safeExternalUrl } from "../lib/format";
 import WatchlistAlerts from "../components/WatchlistAlerts";
 import WatchlistTools from "../components/WatchlistTools";
+import PageHeader from "../components/PageHeader";
 
 type Window = "1d" | "7d" | "30d";
 const WINDOW_OPTIONS: { value: Window; label: string }[] = [
@@ -41,22 +42,22 @@ export default function FavouritesPage() {
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 text-primary shrink-0">
-            <StarIcon size={19} />
+      <PageHeader
+        icon={StarIcon}
+        eyebrow="Pinned signals"
+        title="Watchlist"
+        description="Repos you are watching, snapshotted hourly"
+        actions={(
+          <div className="flex w-full min-w-0 gap-2 sm:w-auto">
+            <div className="min-w-0 flex-[1.65] sm:flex-none">
+              <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
+            </div>
+            <div className="min-w-0 flex-1 sm:flex-none">
+              <DensityToggle value={density} onChange={setDensity} />
+            </div>
           </div>
-          <div>
-            <div className="eyebrow !text-[9px]">Pinned signals</div>
-            <h1 className="text-lg font-bold leading-tight mt-0.5">Watchlist</h1>
-            <p className="text-xs text-muted">Repos you are watching, snapshotted hourly</p>
-          </div>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
-          <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
-          <DensityToggle value={density} onChange={setDensity} />
-        </div>
-      </div>
+        )}
+      />
 
       {isLoading ? (
         <RepoListSkeleton />

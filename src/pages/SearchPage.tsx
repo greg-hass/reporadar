@@ -7,7 +7,7 @@ import RepoRow from "../components/RepoRow";
 import RepoListSkeleton from "../components/Skeleton";
 import LoadMore from "../components/LoadMore";
 import { EmptyState, ErrorState } from "../components/States";
-import { Logo } from "../components/icons";
+import { Logo, SearchIcon } from "../components/icons";
 import { useSearch } from "../hooks/useSearch";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
@@ -15,6 +15,7 @@ import { safeExternalUrl } from "../lib/format";
 import type { Repo, SortKey } from "../lib/types";
 import SavedSearches from "../components/SavedSearches";
 import type { SavedSearch } from "../hooks/useSavedSearches";
+import PageHeader from "../components/PageHeader";
 
 const EXAMPLES = ["terminal emulator", "llm agent framework", "self-hosted dashboard"];
 
@@ -72,7 +73,12 @@ export default function SearchPage() {
 
   return (
     <div className="max-w-5xl mx-auto w-full min-w-0 flex flex-col gap-4">
-      <div className="eyebrow">Query the archive</div>
+      <PageHeader
+        icon={SearchIcon}
+        eyebrow="Repository search"
+        title="Search GitHub"
+        description="Find repos by language, stars, freshness, and more"
+      />
       {/* key resets the input when the query changes from outside (e.g. example chips) */}
       <SearchBar key={q} initial={q} onSearch={(val) => patch({ q: val })} />
 

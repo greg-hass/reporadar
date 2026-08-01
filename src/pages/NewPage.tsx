@@ -12,6 +12,7 @@ import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 import { relativeTime, safeExternalUrl } from "../lib/format";
 import type { Repo } from "../lib/types";
+import PageHeader from "../components/PageHeader";
 
 type Days = "1" | "7" | "30";
 const DAYS_OPTIONS: { value: Days; label: string }[] = [
@@ -51,22 +52,22 @@ export default function NewPage() {
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 text-primary shrink-0">
-            <SparklesIcon size={19} />
+      <PageHeader
+        icon={SparklesIcon}
+        eyebrow="Fresh signals"
+        title="New & rising"
+        description="Recently created repos with early momentum"
+        actions={(
+          <div className="flex w-full min-w-0 gap-2 sm:w-auto">
+            <div className="min-w-0 flex-[1.65] sm:flex-none">
+              <SegmentedControl value={days} options={DAYS_OPTIONS} onChange={changeDays} ariaLabel="Created within" />
+            </div>
+            <div className="min-w-0 flex-1 sm:flex-none">
+              <DensityToggle value={density} onChange={setDensity} />
+            </div>
           </div>
-          <div>
-            <div className="eyebrow !text-[9px]">Fresh signals</div>
-            <h1 className="font-display text-lg font-bold leading-tight mt-0.5">New &amp; rising</h1>
-            <p className="text-xs text-muted">Recently created repos with early momentum</p>
-          </div>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
-          <SegmentedControl value={days} options={DAYS_OPTIONS} onChange={changeDays} ariaLabel="Created within" />
-          <DensityToggle value={density} onChange={setDensity} />
-        </div>
-      </div>
+        )}
+      />
 
       {isLoading ? (
         <RepoListSkeleton />

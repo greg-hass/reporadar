@@ -22,7 +22,7 @@ export default function App() {
             <Sidebar />
             <div className="flex-1 flex flex-col min-w-0">
               <Header />
-              <main className="flex-1 px-4 pt-5 pb-24 md:px-6 md:pt-6 md:pb-10 lg:px-10 lg:pt-8">
+              <main className="flex-1 px-4 pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))] md:px-6 md:pt-6 md:pb-10 lg:px-10 lg:pt-8">
                 <Routes>
                   <Route path="/" element={<RisersPage />} />
                   <Route path="/search" element={<SearchPage />} />
