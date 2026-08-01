@@ -96,11 +96,9 @@ export function createApp(
 			);
 			res.json(result);
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "risers failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "risers failed",
+			});
 		}
 	});
 
@@ -108,11 +106,9 @@ export function createApp(
 		try {
 			res.json(await storage.queryStats());
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "stats failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "stats failed",
+			});
 		}
 	});
 
@@ -124,15 +120,12 @@ export function createApp(
 		}
 		try {
 			const rawDays = req.query.days ? Number(ONE(req.query.days)) : 30;
-			const days =
-				Number.isFinite(rawDays) && rawDays > 0 ? rawDays : 30;
+			const days = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : 30;
 			res.json({ points: await storage.queryHistory(id, days) });
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "history failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "history failed",
+			});
 		}
 	});
 
@@ -170,11 +163,9 @@ export function createApp(
 				),
 			});
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "readme failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "readme failed",
+			});
 		}
 	});
 
@@ -183,11 +174,9 @@ export function createApp(
 			const items = await storage.queryFavourites(windowDays(req.query.window));
 			res.json({ items, total: items.length });
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "favourites failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "favourites failed",
+			});
 		}
 	});
 
@@ -195,11 +184,9 @@ export function createApp(
 		try {
 			res.json({ ids: await storage.listFavouriteIds() });
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "favourites failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "favourites failed",
+			});
 		}
 	});
 
@@ -218,11 +205,9 @@ export function createApp(
 			await storage.addFavourite(repo);
 			res.json({ ok: true });
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "favourite failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "favourite failed",
+			});
 		}
 	});
 
@@ -236,11 +221,9 @@ export function createApp(
 			await storage.removeFavourite(id);
 			res.json({ ok: true });
 		} catch (error) {
-			res
-				.status(500)
-				.json({
-					error: error instanceof Error ? error.message : "unfavourite failed",
-				});
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "unfavourite failed",
+			});
 		}
 	});
 
