@@ -91,12 +91,15 @@ export default function RepoDetailPage() {
 
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
-                <button
-        onClick={() => navigate(-1)}
-        className="sticky top-3 z-30 self-start rounded-full bg-surface/80 backdrop-blur px-3.5 py-1.5 text-xs text-muted hover:text-text transition-colors"
-      >
-        ← Back
-      </button>
+      <div className="h-7 shrink-0">
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Go back"
+          className="fixed left-4 top-[calc(3.5rem+env(safe-area-inset-top)+0.75rem)] z-50 rounded-full bg-surface/95 px-3.5 py-1.5 text-xs text-muted shadow-card backdrop-blur transition-colors hover:text-text lg:sticky lg:left-auto lg:top-3 lg:self-start"
+        >
+          ← Back
+        </button>
+      </div>
 
       {isLoading ? (
         <div className="panel p-5 sm:p-6">
