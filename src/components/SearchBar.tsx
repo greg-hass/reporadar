@@ -42,7 +42,7 @@ export default function SearchBar({ initial, onSearch }: Props) {
           onChange={(e) => setValue(e.target.value)}
           placeholder="Search repos, e.g. macOS codex terminal…"
           enterKeyHint="search"
-          className="input w-full !rounded-xl !bg-surface pl-10 pr-10 !py-3 text-[15px] shadow-card"
+          className="input w-full !rounded-xl !bg-surface pl-10 pr-10 !py-3 text-base shadow-card md:text-[15px]"
         />
         <kbd className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 items-center justify-center w-5 h-5 rounded border border-border text-[11px] text-muted pointer-events-none">
           /
