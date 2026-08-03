@@ -28,18 +28,32 @@ function starsBlock(repo: Repo) {
   );
 }
 
+function topicList(value: string): string[] {
+  return [...new Set(value.split(",").map((topic) => topic.trim().toLowerCase()).filter(Boolean))].slice(0, 10);
+}
+
 export default function SearchPage() {
   const [sp, setSp] = useSearchParams();
   const q = sp.get("q") ?? "";
   const language = sp.get("language") ?? "";
+  const topics = sp.get("topics") ?? "";
   const minStars = Number(sp.get("minStars") ?? 0);
   const createdSinceDays = Number(sp.get("createdSinceDays") ?? 0);
+  const pushedSinceDays = Number(sp.get("pushedSinceDays") ?? 0);
   const sort = (sp.get("sort") as SortKey) ?? "best-match";
   const [density, setDensity] = useDensity();
 
   const enabled = q.length > 0;
   const { data, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } = useSearch(
-    { q, language: language || undefined, minStars: minStars || undefined, createdSinceDays: createdSinceDays || undefined, sort },
+    {
+      q,
+      language: language || undefined,
+      topics: topicList(topics),
+      minStars: minStars || undefined,
+      createdSinceDays: createdSinceDays || undefined,
+      pushedSinceDays: pushedSinceDays || undefined,
+      sort,
+    },
     enabled
   );
 
@@ -55,8 +69,9 @@ export default function SearchPage() {
     reset();
     const next = new URLSearchParams(sp);
     for (const [k, v] of Object.entries(p)) {
-      if (v === "" || v === 0) next.delete(k);
-      else next.set(k, String(v));
+      const value = k === "topics" ? topicList(String(v)).join(",") : v;
+      if (value === "" || value === 0) next.delete(k);
+      else next.set(k, String(value));
     }
     setSp(next);
   };
@@ -65,8 +80,10 @@ export default function SearchPage() {
     patch({
       q: search.q,
       language: search.language,
+      topics: search.topics,
       minStars: search.minStars,
       createdSinceDays: search.createdSinceDays,
+      pushedSinceDays: search.pushedSinceDays,
       sort: search.sort,
     });
   };
@@ -108,12 +125,14 @@ export default function SearchPage() {
         <>
           <FilterRail
             language={language}
+            topics={topics}
             minStars={minStars}
             createdSinceDays={createdSinceDays}
+            pushedSinceDays={pushedSinceDays}
             onChange={patch}
           />
           <SavedSearches
-            query={{ q, language, minStars, createdSinceDays, sort }}
+            query={{ q, language, topics, minStars, createdSinceDays, pushedSinceDays, sort }}
             onApply={applySavedSearch}
           />
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">

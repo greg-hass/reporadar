@@ -1,10 +1,17 @@
 import { createServer, type Server } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStorage } from "../api/_lib/storage";
-import { createApp, runTrackingJob, type AppConfig } from "./index";
+import {
+	createApp,
+	deliverWatchlistAlerts,
+	isTelegramQuietHours,
+	runTrackingJob,
+	sendTelegramAlert,
+	type AppConfig,
+} from "./index";
 
 const repoPayload = {
 	id: 42,
@@ -28,6 +35,7 @@ const tempDirs: string[] = [];
 const servers: Server[] = [];
 
 afterEach(async () => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	await Promise.all(
 		servers
@@ -53,6 +61,75 @@ async function listen(app: ReturnType<typeof createApp>): Promise<string> {
 }
 
 describe("RepoRadar API", () => {
+	it("sends Markdown through the configured bridge CLI", async () => {
+		const dir = await mkdtemp(
+			path.join(os.tmpdir(), "reporadar-telegram-cli-"),
+		);
+		tempDirs.push(dir);
+		const bridge = path.join(dir, "bridge.cjs");
+		await writeFile(
+			bridge,
+			"process.stdin.resume(); process.stdin.on('end', () => process.exit(0));",
+		);
+
+		await expect(
+			sendTelegramAlert(
+				{ telegramBridgeCli: bridge, telegramTimeoutMs: 2_000 },
+				"RepoRadar test alert",
+			),
+		).resolves.toBeUndefined();
+	});
+
+	it("applies a quiet-hour window across midnight", () => {
+		const config: AppConfig = {
+			telegramQuietStartHour: 23,
+			telegramQuietEndHour: 7,
+		};
+		expect(isTelegramQuietHours(config, new Date("2026-07-01T23:30:00"))).toBe(
+			true,
+		);
+		expect(isTelegramQuietHours(config, new Date("2026-07-01T12:30:00"))).toBe(
+			false,
+		);
+	});
+
+	it("delivers Telegram candidates once and suppresses duplicate snapshots", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-alert-api-"));
+		tempDirs.push(dir);
+		const storage = createStorage({ mode: "lite", dataDir: dir });
+		const alertRepo = {
+			id: 42,
+			fullName: "greg-hass/reporadar",
+			description: "A dashboard",
+			language: "TypeScript",
+			topics: ["github"],
+			starsTotal: 10,
+			forks: 2,
+			createdAt: "2026-01-01T00:00:00Z",
+			pushedAt: "2026-01-02T00:00:00Z",
+			license: "MIT",
+			ownerAvatar: "https://example.com/avatar.png",
+			htmlUrl: "https://github.com/greg-hass/reporadar",
+		};
+		await storage.addFavourite(alertRepo);
+		await storage.updateFavourites([alertRepo.id], {
+			telegramEnabled: true,
+			alertThreshold: 5,
+		});
+		await storage.upsertAndSnapshot([alertRepo]);
+		vi.setSystemTime(new Date("2026-07-01T01:00:00.000Z"));
+		await storage.upsertAndSnapshot([{ ...alertRepo, starsTotal: 20 }]);
+
+		const notify = vi.fn().mockResolvedValue(undefined);
+		const config: AppConfig = { mode: "lite", dataDir: dir };
+		expect(await deliverWatchlistAlerts(config, storage, notify)).toBe(1);
+		expect(await deliverWatchlistAlerts(config, storage, notify)).toBe(0);
+		expect(notify).toHaveBeenCalledOnce();
+		expect(notify.mock.calls[0]?.[1]).toContain("+10 stars");
+	});
+
 	it("runs the basic API without Postgres in lite mode", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-api-"));
 		tempDirs.push(dir);
@@ -67,6 +144,13 @@ describe("RepoRadar API", () => {
 		expect(await stats.json()).toMatchObject({
 			reposTracked: 0,
 			snapshotsToday: 0,
+		});
+
+		const pulse = await fetch(`${baseUrl}/api/pulse?since=not-a-date`);
+		expect(pulse.status).toBe(200);
+		expect(await pulse.json()).toMatchObject({
+			items: [],
+			stats: { reposTracked: 0, snapshotCount: 0, trackedSince: null },
 		});
 	});
 
@@ -99,9 +183,7 @@ describe("RepoRadar API", () => {
 	it("sanitizes hostile favourite payloads before storing them", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(
-			createApp({ mode: "lite", dataDir: dir }),
-		);
+		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
 
 		const put = await fetch(`${baseUrl}/api/favourites/7`, {
 			method: "PUT",
@@ -139,12 +221,76 @@ describe("RepoRadar API", () => {
 		expect(items[0]).not.toHaveProperty("extra");
 	});
 
+	it("persists single and bulk watchlist metadata updates", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-meta-"));
+		tempDirs.push(dir);
+		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
+
+		for (const id of [42, 43]) {
+			const put = await fetch(`${baseUrl}/api/favourites/${id}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					id,
+					fullName: `owner/repo-${id}`,
+					description: "A dashboard",
+					language: "TypeScript",
+					topics: ["github"],
+					starsTotal: 12,
+					forks: 2,
+					createdAt: "2026-01-01T00:00:00Z",
+					pushedAt: "2026-01-02T00:00:00Z",
+					license: "MIT",
+					ownerAvatar: "https://example.com/avatar.png",
+					htmlUrl: `https://github.com/owner/repo-${id}`,
+				}),
+			});
+			expect(put.status).toBe(200);
+		}
+
+		const bulk = await fetch(`${baseUrl}/api/favourites`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				ids: [42, 43],
+				patch: { tags: [" Frontend ", "frontend"], status: "building" },
+			}),
+		});
+		expect(bulk.status).toBe(200);
+		expect(await bulk.json()).toEqual({ ok: true, updated: 2 });
+
+		const single = await fetch(`${baseUrl}/api/favourites/42`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ note: "Review this" }),
+		});
+		expect(single.status).toBe(200);
+
+		const favourites = await fetch(`${baseUrl}/api/favourites`);
+		const { items } = (await favourites.json()) as {
+			items: Array<{ id: number; watchlist: unknown }>;
+		};
+		expect(items).toHaveLength(2);
+		expect(items.find((item) => item.id === 42)?.watchlist).toEqual({
+			tags: ["frontend"],
+			note: "Review this",
+			status: "building",
+			telegramEnabled: false,
+			alertThreshold: 50,
+		});
+		expect(items.find((item) => item.id === 43)?.watchlist).toEqual({
+			tags: ["frontend"],
+			note: "",
+			status: "building",
+			telegramEnabled: false,
+			alertThreshold: 50,
+		});
+	});
+
 	it("rejects malformed favourite payloads", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-bad-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(
-			createApp({ mode: "lite", dataDir: dir }),
-		);
+		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
 
 		const bad = await fetch(`${baseUrl}/api/favourites/1`, {
 			method: "PUT",
@@ -164,9 +310,7 @@ describe("RepoRadar API", () => {
 	it("defaults a malformed days window instead of 500ing", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-days-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(
-			createApp({ mode: "lite", dataDir: dir }),
-		);
+		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
 
 		const response = await fetch(`${baseUrl}/api/repos/42/history?days=abc`);
 		expect(response.status).toBe(200);

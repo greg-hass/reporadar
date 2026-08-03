@@ -6,17 +6,60 @@ export interface SavedSearch {
   label: string;
   q: string;
   language: string;
+  topics: string;
   minStars: number;
   createdSinceDays: number;
+  pushedSinceDays: number;
   sort: SortKey;
 }
 
 const STORAGE_KEY = "reporadar-saved-searches";
 
+function searchId(search: Omit<SavedSearch, "id">): string {
+  return [
+    search.q,
+    search.language,
+    search.topics,
+    search.minStars,
+    search.createdSinceDays,
+    search.pushedSinceDays,
+    search.sort,
+  ].join(":");
+}
+
+function normalizeSavedSearch(value: unknown): SavedSearch | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<SavedSearch>;
+  if (typeof candidate.q !== "string" || !candidate.q) return null;
+  const minStars = Number.isFinite(candidate.minStars) ? Math.max(0, Number(candidate.minStars)) : 0;
+  const createdSinceDays = Number.isFinite(candidate.createdSinceDays)
+    ? Math.max(0, Number(candidate.createdSinceDays))
+    : 0;
+  const pushedSinceDays = Number.isFinite(candidate.pushedSinceDays)
+    ? Math.max(0, Number(candidate.pushedSinceDays))
+    : 0;
+  const search = {
+    label: typeof candidate.label === "string" && candidate.label ? candidate.label : candidate.q,
+    q: candidate.q,
+    language: typeof candidate.language === "string" ? candidate.language : "",
+    topics: typeof candidate.topics === "string" ? candidate.topics : "",
+    minStars,
+    createdSinceDays,
+    pushedSinceDays,
+    sort: candidate.sort ?? "best-match",
+  } satisfies Omit<SavedSearch, "id">;
+  return { ...search, id: searchId(search) };
+}
+
 function load(): SavedSearch[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]") as SavedSearch[];
-    return Array.isArray(parsed) ? parsed.slice(0, 12) : [];
+    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.flatMap((item) => {
+          const normalized = normalizeSavedSearch(item);
+          return normalized ? [normalized] : [];
+        }).slice(0, 12)
+      : [];
   } catch {
     return [];
   }
@@ -32,9 +75,10 @@ export function useSavedSearches() {
   return {
     saved,
     save: (search: Omit<SavedSearch, "id">) => {
+      const id = searchId(search);
       setSaved((current) => [
-        { ...search, id: `${search.q}:${search.language}:${search.minStars}:${search.createdSinceDays}:${search.sort}` },
-        ...current.filter((item) => item.id !== `${search.q}:${search.language}:${search.minStars}:${search.createdSinceDays}:${search.sort}`),
+        { ...search, id },
+        ...current.filter((item) => item.id !== id),
       ].slice(0, 12));
     },
     remove: (id: string) => setSaved((current) => current.filter((item) => item.id !== id)),

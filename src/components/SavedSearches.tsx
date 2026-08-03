@@ -6,8 +6,10 @@ import { CheckIcon, CopyIcon } from "./icons";
 interface QueryState {
   q: string;
   language: string;
+  topics: string;
   minStars: number;
   createdSinceDays: number;
+  pushedSinceDays: number;
   sort: SortKey;
 }
 
@@ -31,7 +33,12 @@ export default function SavedSearches({ query, onApply }: { query: QueryState; o
       )}
       {saved.map((item) => (
         <span key={item.id} className="inline-flex max-w-full items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-[11px] text-muted">
-          <button type="button" onClick={() => onApply(item)} className="truncate hover:text-text" title={item.label}>
+          <button
+            type="button"
+            onClick={() => onApply(item)}
+            className="truncate hover:text-text"
+            title={`${item.label}${item.topics ? ` · ${item.topics}` : ""}`}
+          >
             {item.label}
           </button>
           <button

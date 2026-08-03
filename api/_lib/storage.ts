@@ -2,16 +2,26 @@ import type { NormalizedRepo } from "./github";
 import {
 	addFavourite,
 	ensureSchema,
+	hasAlertEvent,
 	listFavouriteIds,
+	queryAlertCandidates,
 	queryFavourites,
 	queryHistory,
 	queryRepoByName,
+	queryPulse,
 	queryRisers,
 	queryStats,
+	recordAlertEvent,
 	removeFavourite,
+	updateFavourites,
 	upsertAndSnapshot,
+	type AlertCandidate,
+	type AlertEvent,
+	type FavouritePatch,
 	type HistoryPoint,
+	type PulseResult,
 	type RepoStats,
+	type WatchlistRepo,
 } from "./db";
 import { LiteStore } from "./lite-store";
 
@@ -28,16 +38,19 @@ export interface RepoStorage {
 		total: number;
 	}>;
 	queryStats(): Promise<RepoStats>;
+	queryPulse(since: string, limit?: number): Promise<PulseResult>;
 	queryHistory(repoId: number, days: number): Promise<HistoryPoint[]>;
 	queryRepoByName(fullName: string): Promise<NormalizedRepo | null>;
 	listFavouriteIds(): Promise<number[]>;
 	addFavourite(repo: NormalizedRepo): Promise<void>;
 	removeFavourite(repoId: number): Promise<void>;
-	queryFavourites(
-		windowDays: number,
-	): Promise<
-		(NormalizedRepo & { starDelta: number | null; history: number[] })[]
-	>;
+	updateFavourites(repoIds: number[], patch: FavouritePatch): Promise<void>;
+	queryFavourites(windowDays: number): Promise<WatchlistRepo[]>;
+	queryAlertCandidates(): Promise<AlertCandidate[]>;
+	hasAlertEvent(signature: string): Promise<boolean>;
+	recordAlertEvent(
+		event: Pick<AlertEvent, "signature" | "repoId" | "snapshotAt">,
+	): Promise<void>;
 }
 
 class PostgresStore implements RepoStorage {
@@ -61,6 +74,10 @@ class PostgresStore implements RepoStorage {
 		return queryStats(this.connStr);
 	}
 
+	queryPulse(since: string, limit?: number) {
+		return queryPulse(this.connStr, since, limit);
+	}
+
 	queryHistory(repoId: number, days: number) {
 		return queryHistory(this.connStr, repoId, days);
 	}
@@ -81,8 +98,26 @@ class PostgresStore implements RepoStorage {
 		return removeFavourite(this.connStr, repoId);
 	}
 
+	updateFavourites(repoIds: number[], patch: FavouritePatch) {
+		return updateFavourites(this.connStr, repoIds, patch);
+	}
+
 	queryFavourites(windowDays: number) {
 		return queryFavourites(this.connStr, windowDays);
+	}
+
+	queryAlertCandidates() {
+		return queryAlertCandidates(this.connStr);
+	}
+
+	hasAlertEvent(signature: string) {
+		return hasAlertEvent(this.connStr, signature);
+	}
+
+	recordAlertEvent(
+		event: Pick<AlertEvent, "signature" | "repoId" | "snapshotAt">,
+	) {
+		return recordAlertEvent(this.connStr, event);
 	}
 }
 

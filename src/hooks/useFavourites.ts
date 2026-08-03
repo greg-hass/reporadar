@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteFavourite, fetchFavouriteIds, fetchFavourites, putFavourite } from "../lib/api";
-import type { Repo } from "../lib/types";
+import {
+  deleteFavourite,
+  fetchFavouriteIds,
+  fetchFavourites,
+  putFavourite,
+  updateFavourites,
+} from "../lib/api";
+import type { Repo, WatchlistPatch } from "../lib/types";
 import { useToast } from "../components/Toast";
 
 type Window = "1d" | "7d" | "30d";
@@ -13,6 +19,22 @@ export function useFavourites(window: Window) {
   return useQuery({
     queryKey: ["favourites", window],
     queryFn: () => fetchFavourites(window),
+  });
+}
+
+export function useUpdateWatchlist() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: ({ ids, patch }: { ids: number[]; patch: WatchlistPatch }) =>
+      updateFavourites(ids, patch),
+    onSuccess: (_result, { ids }) => {
+      qc.invalidateQueries({ queryKey: ["favourites"] });
+      toast.show(`${ids.length} watchlist item${ids.length === 1 ? "" : "s"} updated.`);
+    },
+    onError: () => {
+      toast.show("Couldn't save those watchlist details. Try again.");
+    },
   });
 }
 

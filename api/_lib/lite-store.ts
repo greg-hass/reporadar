@@ -1,7 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { NormalizedRepo } from "./github.js";
-import type { HistoryPoint, RepoStats } from "./db.js";
+import type {
+	AlertCandidate,
+	AlertEvent,
+	FavouritePatch,
+	HistoryPoint,
+	PulseItem,
+	PulseResult,
+	RepoStats,
+	WatchlistMeta,
+	WatchlistRepo,
+	WatchlistStatus,
+} from "./db.js";
 import type { RepoStorage } from "./storage.js";
 
 type Snapshot = {
@@ -10,21 +21,169 @@ type Snapshot = {
 	stars: number;
 };
 
+type FavouriteRecord = NormalizedRepo & { watchlist: WatchlistMeta };
+
 type LiteState = {
 	repos: NormalizedRepo[];
 	snapshots: Snapshot[];
-	favourites: NormalizedRepo[];
+	favourites: FavouriteRecord[];
+	alertEvents: AlertEvent[];
 };
 
-const EMPTY_STATE: LiteState = { repos: [], snapshots: [], favourites: [] };
+const EMPTY_STATE: LiteState = {
+	repos: [],
+	snapshots: [],
+	favourites: [],
+	alertEvents: [],
+};
 const MAX_SNAPSHOTS = 50_000;
+const MAX_ALERT_EVENTS = 10_000;
+const WATCHLIST_STATUSES: WatchlistStatus[] = [
+	"watching",
+	"building",
+	"paused",
+	"archived",
+];
+
+function defaultWatchlistMeta(): WatchlistMeta {
+	return {
+		tags: [],
+		note: "",
+		status: "watching",
+		telegramEnabled: false,
+		alertThreshold: 50,
+	};
+}
+
+function normalizeWatchlistMeta(value: unknown): WatchlistMeta {
+	if (typeof value !== "object" || value === null)
+		return defaultWatchlistMeta();
+	const candidate = value as Record<string, unknown>;
+	const tags = Array.isArray(candidate.tags)
+		? candidate.tags.filter((tag): tag is string => typeof tag === "string")
+		: [];
+	const status = WATCHLIST_STATUSES.includes(
+		candidate.status as WatchlistStatus,
+	)
+		? (candidate.status as WatchlistStatus)
+		: "watching";
+	const threshold =
+		typeof candidate.alertThreshold === "number" &&
+		Number.isFinite(candidate.alertThreshold) &&
+		candidate.alertThreshold >= 1
+			? Math.min(Math.floor(candidate.alertThreshold), 1_000_000)
+			: 50;
+	return {
+		tags: tags.slice(0, 12),
+		note:
+			typeof candidate.note === "string" ? candidate.note.slice(0, 500) : "",
+		status,
+		telegramEnabled: candidate.telegramEnabled === true,
+		alertThreshold: threshold,
+	};
+}
+
+function normalizeFavourite(value: unknown): FavouriteRecord | null {
+	if (typeof value !== "object" || value === null) return null;
+	const candidate = value as Record<string, unknown>;
+	if (
+		typeof candidate.id !== "number" ||
+		typeof candidate.fullName !== "string"
+	)
+		return null;
+	return {
+		...(candidate as unknown as NormalizedRepo),
+		watchlist: normalizeWatchlistMeta(candidate.watchlist),
+	};
+}
+
+function normalizeAlertEvent(value: unknown): AlertEvent | null {
+	if (typeof value !== "object" || value === null) return null;
+	const candidate = value as Record<string, unknown>;
+	if (
+		typeof candidate.signature !== "string" ||
+		typeof candidate.repoId !== "number" ||
+		typeof candidate.snapshotAt !== "string" ||
+		typeof candidate.sentAt !== "string"
+	) {
+		return null;
+	}
+	return {
+		signature: candidate.signature,
+		repoId: candidate.repoId,
+		snapshotAt: candidate.snapshotAt,
+		sentAt: candidate.sentAt,
+	};
+}
 
 function cloneState(state: LiteState): LiteState {
 	return {
 		repos: [...state.repos],
 		snapshots: [...state.snapshots],
-		favourites: [...state.favourites],
+		favourites: state.favourites.map((favourite) => ({
+			...favourite,
+			watchlist: {
+				...favourite.watchlist,
+				tags: [...favourite.watchlist.tags],
+			},
+		})),
+		alertEvents: state.alertEvents.map((event) => ({ ...event })),
 	};
+}
+
+function groupSnapshots(snapshots: Snapshot[]): Map<number, Snapshot[]> {
+	const grouped = new Map<number, Snapshot[]>();
+	for (const snapshot of snapshots) {
+		const items = grouped.get(snapshot.repoId) ?? [];
+		items.push(snapshot);
+		grouped.set(snapshot.repoId, items);
+	}
+	return grouped;
+}
+
+function pulseItemFor(
+	repo: NormalizedRepo | undefined,
+	snapshots: Snapshot[],
+	isFavourite: boolean,
+	sinceMs: number,
+): PulseItem | null {
+	if (!repo) return null;
+	const ordered = [...snapshots].sort((a, b) =>
+		a.capturedAt.localeCompare(b.capturedAt),
+	);
+	const current = ordered.at(-1);
+	const first = ordered[0];
+	if (!current || !first || Date.parse(current.capturedAt) <= sinceMs)
+		return null;
+
+	let prior: Snapshot | undefined;
+	for (let index = ordered.length - 1; index >= 0; index -= 1) {
+		if (Date.parse(ordered[index].capturedAt) <= sinceMs) {
+			prior = ordered[index];
+			break;
+		}
+	}
+	const starDelta = current.stars - (prior?.stars ?? current.stars);
+	const isNew = Date.parse(first.capturedAt) > sinceMs;
+	if (!isNew && (!isFavourite || starDelta <= 0)) return null;
+
+	return {
+		repo,
+		kind: isFavourite ? "watchlist-change" : "new-signal",
+		starDelta,
+		snapshotCount: ordered.length,
+		trackedSince: first.capturedAt,
+		lastSnapshotAt: current.capturedAt,
+		isFavourite,
+	};
+}
+
+function comparePulseItems(a: PulseItem, b: PulseItem): number {
+	return (
+		Number(b.isFavourite) - Number(a.isFavourite) ||
+		b.starDelta - a.starDelta ||
+		b.lastSnapshotAt.localeCompare(a.lastSnapshotAt)
+	);
 }
 
 // This class intentionally owns the complete file-backed store: keeping state,
@@ -131,18 +290,52 @@ export class LiteStore implements RepoStorage {
 			(total, points) => total + Math.max(...points) - Math.min(...points),
 			0,
 		);
-		const lastSnapshotAt =
-			this.state.snapshots
-				.map((snapshot) => snapshot.capturedAt)
-				.sort((a, b) => a.localeCompare(b))
-				.at(-1) ?? null;
+		const snapshotTimes = this.state.snapshots
+			.map((snapshot) => snapshot.capturedAt)
+			.sort((a, b) => a.localeCompare(b));
+		const lastSnapshotAt = snapshotTimes.at(-1) ?? null;
 
 		return Promise.resolve({
 			reposTracked: this.state.repos.length,
 			snapshotsToday: todays.length,
 			starsGainedToday,
+			snapshotCount: this.state.snapshots.length,
+			trackedSince: snapshotTimes[0] ?? null,
 			lastSnapshotAt,
 		});
+	}
+
+	async queryPulse(since: string, limit = 12): Promise<PulseResult> {
+		const parsedSince = Date.parse(since);
+		const sinceMs = Number.isFinite(parsedSince)
+			? parsedSince
+			: Date.now() - 86_400_000;
+		const normalizedSince = new Date(sinceMs).toISOString();
+		const repos = new Map(this.state.repos.map((repo) => [repo.id, repo]));
+		for (const favourite of this.state.favourites) {
+			if (!repos.has(favourite.id)) repos.set(favourite.id, favourite);
+		}
+		const favourites = new Set(this.state.favourites.map((repo) => repo.id));
+		const snapshotsByRepo = groupSnapshots(this.state.snapshots);
+		const items = [...snapshotsByRepo.entries()]
+			.map(([repoId, snapshots]) =>
+				pulseItemFor(
+					repos.get(repoId),
+					snapshots,
+					favourites.has(repoId),
+					sinceMs,
+				),
+			)
+			.filter((item): item is PulseItem => item !== null)
+			.sort(comparePulseItems)
+			.slice(0, Math.max(1, limit));
+
+		return {
+			items,
+			since: normalizedSince,
+			generatedAt: new Date().toISOString(),
+			stats: await this.queryStats(),
+		};
 	}
 
 	async queryHistory(repoId: number, days: number): Promise<HistoryPoint[]> {
@@ -168,7 +361,10 @@ export class LiteStore implements RepoStorage {
 		if (!this.state.favourites.some((favourite) => favourite.id === repo.id)) {
 			this.state = {
 				...this.state,
-				favourites: [...this.state.favourites, repo],
+				favourites: [
+					...this.state.favourites,
+					{ ...repo, watchlist: defaultWatchlistMeta() },
+				],
 			};
 			await this.persist();
 		}
@@ -182,11 +378,84 @@ export class LiteStore implements RepoStorage {
 		await this.persist();
 	}
 
-	queryFavourites(
-		windowDays: number,
-	): Promise<
-		(NormalizedRepo & { starDelta: number | null; history: number[] })[]
-	> {
+	async updateFavourites(
+		repoIds: number[],
+		patch: FavouritePatch,
+	): Promise<void> {
+		if (!repoIds.length) return;
+		const selected = new Set(repoIds);
+		this.state = {
+			...this.state,
+			favourites: this.state.favourites.map((favourite) =>
+				selected.has(favourite.id)
+					? {
+							...favourite,
+							watchlist: {
+								...favourite.watchlist,
+								...patch,
+								tags: patch.tags ? [...patch.tags] : favourite.watchlist.tags,
+							},
+						}
+					: favourite,
+			),
+		};
+		await this.persist();
+	}
+
+	queryAlertCandidates(): Promise<AlertCandidate[]> {
+		const repos = new Map(this.state.repos.map((repo) => [repo.id, repo]));
+		const candidates = this.state.favourites
+			.filter(
+				(favourite) =>
+					favourite.watchlist.telegramEnabled &&
+					favourite.watchlist.status !== "paused" &&
+					favourite.watchlist.status !== "archived",
+			)
+			.map((favourite) => {
+				const ordered = this.state.snapshots
+					.filter((snapshot) => snapshot.repoId === favourite.id)
+					.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+				const current = ordered.at(-1);
+				const previous = ordered.at(-2);
+				if (!current) return null;
+				const starDelta = current.stars - (previous?.stars ?? current.stars);
+				if (starDelta < favourite.watchlist.alertThreshold) return null;
+				return {
+					repo: repos.get(favourite.id) ?? favourite,
+					starDelta,
+					snapshotAt: current.capturedAt,
+					previousSnapshotAt: previous?.capturedAt ?? null,
+					watchlist: favourite.watchlist,
+				};
+			})
+			.filter((candidate): candidate is AlertCandidate => candidate !== null);
+		return Promise.resolve(candidates);
+	}
+
+	hasAlertEvent(signature: string): Promise<boolean> {
+		return Promise.resolve(
+			this.state.alertEvents.some((event) => event.signature === signature),
+		);
+	}
+
+	async recordAlertEvent(
+		event: Pick<AlertEvent, "signature" | "repoId" | "snapshotAt">,
+	): Promise<void> {
+		if (
+			this.state.alertEvents.some((item) => item.signature === event.signature)
+		)
+			return;
+		this.state = {
+			...this.state,
+			alertEvents: [
+				...this.state.alertEvents,
+				{ ...event, sentAt: new Date().toISOString() },
+			].slice(-MAX_ALERT_EVENTS),
+		};
+		await this.persist();
+	}
+
+	queryFavourites(windowDays: number): Promise<WatchlistRepo[]> {
 		const latest = this.latestSnapshots();
 		const cutoff = Date.now() - windowDays * 86_400_000;
 		return Promise.resolve(
@@ -199,13 +468,16 @@ export class LiteStore implements RepoStorage {
 							Date.parse(snapshot.capturedAt) >= cutoff,
 					)
 					.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))[0];
+				const repo = this.state.repos.find(
+					(candidate) => candidate.id === favourite.id,
+				);
 				return {
-					...(this.state.repos.find((repo) => repo.id === favourite.id) ??
-						favourite),
+					...(repo ?? favourite),
 					starDelta: current
 						? current.stars - (past?.stars ?? current.stars)
 						: null,
 					history: this.historyFor(favourite.id, 7),
+					watchlist: favourite.watchlist,
 				};
 			}),
 		);
@@ -238,10 +510,25 @@ export class LiteStore implements RepoStorage {
 			const parsed = JSON.parse(
 				fs.readFileSync(this.filePath, "utf8"),
 			) as Partial<LiteState>;
+			const rawFavourites: unknown = parsed.favourites;
+			const favourites = Array.isArray(rawFavourites)
+				? rawFavourites
+						.map(normalizeFavourite)
+						.filter(
+							(favourite): favourite is FavouriteRecord => favourite !== null,
+						)
+				: [];
+			const rawAlertEvents: unknown = parsed.alertEvents;
+			const alertEvents = Array.isArray(rawAlertEvents)
+				? rawAlertEvents
+						.map(normalizeAlertEvent)
+						.filter((event): event is AlertEvent => event !== null)
+				: [];
 			return {
 				repos: Array.isArray(parsed.repos) ? parsed.repos : [],
 				snapshots: Array.isArray(parsed.snapshots) ? parsed.snapshots : [],
-				favourites: Array.isArray(parsed.favourites) ? parsed.favourites : [],
+				favourites,
+				alertEvents,
 			};
 		} catch {
 			return cloneState(EMPTY_STATE);

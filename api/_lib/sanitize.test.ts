@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeFavouritePayload } from "./sanitize";
+import { sanitizeFavouritePatch, sanitizeFavouritePayload } from "./sanitize";
 
 const benign = {
 	id: 42,
@@ -57,10 +57,18 @@ describe("sanitizeFavouritePayload", () => {
 	});
 
 	it("rejects payloads without a valid owner/name fullName", () => {
-		expect(sanitizeFavouritePayload({ ...benign, fullName: "no-slash" }, 42)).toBeNull();
-		expect(sanitizeFavouritePayload({ ...benign, fullName: "a/b/c" }, 42)).toBeNull();
-		expect(sanitizeFavouritePayload({ ...benign, fullName: "bad name/owner" }, 42)).toBeNull();
-		expect(sanitizeFavouritePayload({ ...benign, fullName: 123 }, 42)).toBeNull();
+		expect(
+			sanitizeFavouritePayload({ ...benign, fullName: "no-slash" }, 42),
+		).toBeNull();
+		expect(
+			sanitizeFavouritePayload({ ...benign, fullName: "a/b/c" }, 42),
+		).toBeNull();
+		expect(
+			sanitizeFavouritePayload({ ...benign, fullName: "bad name/owner" }, 42),
+		).toBeNull();
+		expect(
+			sanitizeFavouritePayload({ ...benign, fullName: 123 }, 42),
+		).toBeNull();
 		expect(sanitizeFavouritePayload(null, 42)).toBeNull();
 		expect(sanitizeFavouritePayload("string", 42)).toBeNull();
 	});
@@ -120,5 +128,34 @@ describe("sanitizeFavouritePayload", () => {
 				"topics",
 			].sort(),
 		);
+	});
+});
+
+describe("sanitizeFavouritePatch", () => {
+	it("normalizes watchlist metadata and clamps its shape", () => {
+		const out = sanitizeFavouritePatch({
+			tags: [" Frontend ", "frontend", "", "INFRA"],
+			note: ` ${"x".repeat(600)} `,
+			status: "building",
+			telegramEnabled: true,
+			alertThreshold: 75.8,
+		});
+
+		expect(out).toEqual({
+			tags: ["frontend", "infra"],
+			note: "x".repeat(500),
+			status: "building",
+			telegramEnabled: true,
+			alertThreshold: 75,
+		});
+	});
+
+	it("rejects invalid metadata fields instead of partially accepting them", () => {
+		expect(sanitizeFavouritePatch({ status: "unknown" })).toBeNull();
+		expect(sanitizeFavouritePatch({ tags: "infra" })).toBeNull();
+		expect(sanitizeFavouritePatch({ note: 42 })).toBeNull();
+		expect(sanitizeFavouritePatch({ telegramEnabled: "yes" })).toBeNull();
+		expect(sanitizeFavouritePatch({ alertThreshold: 0 })).toBeNull();
+		expect(sanitizeFavouritePatch({})).toBeNull();
 	});
 });

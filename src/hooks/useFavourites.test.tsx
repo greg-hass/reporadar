@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { useFavouriteIds, useToggleFavourite } from "./useFavourites";
+import {
+  useFavouriteIds,
+  useToggleFavourite,
+  useUpdateWatchlist,
+} from "./useFavourites";
 import type { Repo } from "../lib/types";
 
 const repo: Repo = {
@@ -33,6 +37,9 @@ function statefulMock(initialIds: number[], failPut = false) {
 		const method = (init?.method ?? "GET").toUpperCase();
 		if (method === "GET" && url.pathname === "/api/favourites/ids") {
 			return new Response(JSON.stringify({ ids }));
+		}
+		if (method === "PATCH" && url.pathname === "/api/favourites") {
+			return new Response(JSON.stringify({ ok: true, updated: 1 }));
 		}
 		const match = url.pathname.match(/^\/api\/favourites\/(\d+)$/);
 		if (match) {
@@ -89,6 +96,31 @@ describe("useFavouriteIds", () => {
 		await waitFor(() => expect(result.current.data).toEqual({ ids: [1, 2] }));
 		expect(fetchMock).toHaveBeenCalledWith(
 			expect.stringContaining("/api/favourites/ids"),
+		);
+	});
+});
+
+describe("useUpdateWatchlist", () => {
+	it("PATCHes metadata for a selected set", async () => {
+		const fetchMock = statefulMock([42]);
+		const result = renderHook(() => useUpdateWatchlist(), {
+			wrapper: wrapper(makeClient()),
+		});
+
+		act(() =>
+			result.result.current.mutate({
+				ids: [42],
+				patch: { tags: ["frontend"], note: "Review", status: "building" },
+			}),
+		);
+
+		await waitFor(() => expect(result.result.current.isSuccess).toBe(true));
+		const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
+		expect(patch?.[1]?.body).toBe(
+			JSON.stringify({
+				ids: [42],
+				patch: { tags: ["frontend"], note: "Review", status: "building" },
+			}),
 		);
 	});
 });

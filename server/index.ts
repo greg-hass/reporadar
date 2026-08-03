@@ -1,4 +1,7 @@
 import express, { type Express } from "express";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import cron from "node-cron";
 import {
@@ -14,16 +17,40 @@ import {
 	type RepoStorage,
 	type StorageConfig,
 } from "../api/_lib/storage";
-import { sanitizeFavouritePayload } from "../api/_lib/sanitize";
+import type { AlertCandidate } from "../api/_lib/db";
+import {
+	sanitizeFavouritePatch,
+	sanitizeFavouritePayload,
+} from "../api/_lib/sanitize";
 
 export interface AppConfig extends StorageConfig {
 	port?: number;
 	githubToken?: string;
 	cronSchedule?: string;
+	telegramBridgeCli?: string;
+	telegramQuietStartHour?: number;
+	telegramQuietEndHour?: number;
+	telegramTimeoutMs?: number;
 }
 
 const ONE = (value: unknown): string | undefined =>
 	Array.isArray(value) ? value[0] : (value as string | undefined);
+const DEFAULT_TELEGRAM_BRIDGE_CLI = path.resolve(
+	os.homedir(),
+	".pi",
+	"agent",
+	"telegram-bridge",
+	"dist",
+	"outbound",
+	"cli.js",
+);
+
+function optionalHour(value: string | undefined): number | undefined {
+	const parsed = Number(value);
+	return Number.isInteger(parsed) && parsed >= 0 && parsed < 24
+		? parsed
+		: undefined;
+}
 
 function readConfig(): AppConfig {
 	return {
@@ -33,6 +60,18 @@ function readConfig(): AppConfig {
 		postgresUrl: process.env.POSTGRES_URL,
 		dataDir: process.env.REPORADAR_DATA_DIR,
 		cronSchedule: process.env.CRON_SCHEDULE ?? "0 * * * *",
+		telegramBridgeCli:
+			process.env.REPORADAR_TELEGRAM_BRIDGE_CLI ?? DEFAULT_TELEGRAM_BRIDGE_CLI,
+		telegramQuietStartHour: optionalHour(
+			process.env.REPORADAR_TELEGRAM_QUIET_START,
+		),
+		telegramQuietEndHour: optionalHour(
+			process.env.REPORADAR_TELEGRAM_QUIET_END,
+		),
+		telegramTimeoutMs: Math.max(
+			1_000,
+			Number(process.env.REPORADAR_TELEGRAM_TIMEOUT_MS) || 30_000,
+		),
 	};
 }
 
@@ -47,6 +86,32 @@ function windowDays(value: unknown, fallback = 7): number {
 		default:
 			return fallback;
 	}
+}
+
+function pulseSince(value: unknown): string {
+	const raw = ONE(value);
+	const timestamp = raw ? Date.parse(raw) : Number.NaN;
+	return Number.isFinite(timestamp)
+		? new Date(timestamp).toISOString()
+		: new Date(Date.now() - 7 * 86_400_000).toISOString();
+}
+
+function pulseLimit(value: unknown): number {
+	const parsed = Number(ONE(value));
+	return Number.isFinite(parsed)
+		? Math.min(24, Math.max(1, Math.trunc(parsed)))
+		: 12;
+}
+
+function favouriteIds(value: unknown): number[] | null {
+	if (!Array.isArray(value)) return null;
+	const ids = value
+		.filter(
+			(id): id is number =>
+				typeof id === "number" && Number.isInteger(id) && id > 0,
+		)
+		.slice(0, 100);
+	return ids.length ? [...new Set(ids)] : null;
 }
 
 export function createApp(
@@ -72,6 +137,9 @@ export function createApp(
 				: undefined,
 			createdSinceDays: req.query.createdSinceDays
 				? Number(ONE(req.query.createdSinceDays))
+				: undefined,
+			pushedSinceDays: req.query.pushedSinceDays
+				? Number(ONE(req.query.pushedSinceDays))
 				: undefined,
 			sort: ONE(req.query.sort),
 			page: req.query.page ? Number(ONE(req.query.page)) : undefined,
@@ -108,6 +176,33 @@ export function createApp(
 		} catch (error) {
 			res.status(500).json({
 				error: error instanceof Error ? error.message : "stats failed",
+			});
+		}
+	});
+
+	app.get("/api/alerts/status", (_req, res) => {
+		res.json({
+			telegramConfigured: Boolean(
+				config.telegramBridgeCli && existsSync(config.telegramBridgeCli),
+			),
+			quietHoursConfigured:
+				config.telegramQuietStartHour !== undefined &&
+				config.telegramQuietEndHour !== undefined &&
+				config.telegramQuietStartHour !== config.telegramQuietEndHour,
+		});
+	});
+
+	app.get("/api/pulse", async (req, res) => {
+		try {
+			res.json(
+				await storage.queryPulse(
+					pulseSince(req.query.since),
+					pulseLimit(req.query.limit),
+				),
+			);
+		} catch (error) {
+			res.status(500).json({
+				error: error instanceof Error ? error.message : "pulse failed",
 			});
 		}
 	});
@@ -211,6 +306,43 @@ export function createApp(
 		}
 	});
 
+	app.patch("/api/favourites", async (req, res) => {
+		const body = req.body as { ids?: unknown; patch?: unknown };
+		const ids = favouriteIds(body?.ids);
+		const patch = sanitizeFavouritePatch(body?.patch);
+		if (!ids || !patch) {
+			res.status(400).json({ error: "ids and a valid patch are required" });
+			return;
+		}
+		try {
+			await storage.updateFavourites(ids, patch);
+			res.json({ ok: true, updated: ids.length });
+		} catch (error) {
+			res.status(500).json({
+				error:
+					error instanceof Error ? error.message : "watchlist update failed",
+			});
+		}
+	});
+
+	app.patch("/api/favourites/:id", async (req, res) => {
+		const id = Number(req.params.id);
+		const patch = sanitizeFavouritePatch(req.body);
+		if (!Number.isInteger(id) || id <= 0 || !patch) {
+			res.status(400).json({ error: "repo id and a valid patch are required" });
+			return;
+		}
+		try {
+			await storage.updateFavourites([id], patch);
+			res.json({ ok: true, updated: 1 });
+		} catch (error) {
+			res.status(500).json({
+				error:
+					error instanceof Error ? error.message : "watchlist update failed",
+			});
+		}
+	});
+
 	app.delete("/api/favourites/:id", async (req, res) => {
 		const id = Number(req.params.id);
 		if (!Number.isFinite(id)) {
@@ -227,13 +359,117 @@ export function createApp(
 		}
 	});
 
-	const distDir = path.resolve(__dirname, "..", "..", "dist");
+	const distDir = path.resolve(__dirname, "..", "dist");
 	app.use(express.static(distDir));
 	app.get("*", (_req, res) => {
 		res.sendFile(path.join(distDir, "index.html"));
 	});
 
 	return app;
+}
+
+export type TelegramNotifier = (
+	config: AppConfig,
+	text: string,
+) => Promise<void>;
+
+export function isTelegramQuietHours(
+	config: AppConfig,
+	now = new Date(),
+): boolean {
+	const start = config.telegramQuietStartHour;
+	const end = config.telegramQuietEndHour;
+	if (start === undefined || end === undefined || start === end) return false;
+	const hour = now.getHours();
+	return start < end
+		? hour >= start && hour < end
+		: hour >= start || hour < end;
+}
+
+export function formatTelegramAlert(candidate: AlertCandidate): string {
+	return [
+		`📈 **${candidate.repo.fullName}** gained **+${candidate.starDelta.toLocaleString()} stars** since the last snapshot.`,
+		`Current total: ${candidate.repo.starsTotal.toLocaleString()} stars`,
+		candidate.repo.htmlUrl,
+	].join("\\n");
+}
+
+export function sendTelegramAlert(
+	config: AppConfig,
+	text: string,
+): Promise<void> {
+	const cliPath = config.telegramBridgeCli;
+	if (!cliPath || !existsSync(cliPath)) {
+		return Promise.reject(new Error("Telegram bridge CLI is not configured"));
+	}
+
+	return new Promise((resolve, reject) => {
+		const child = spawn(process.execPath, [cliPath, "--md"], {
+			stdio: ["pipe", "ignore", "ignore"],
+		});
+		let settled = false;
+		const timeout = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			child.kill("SIGTERM");
+			reject(new Error("Telegram bridge timed out"));
+		}, config.telegramTimeoutMs ?? 30_000);
+		const finish = (error?: Error) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			if (error) reject(error);
+			else resolve();
+		};
+		child.once("error", () =>
+			finish(new Error("Telegram bridge could not start")),
+		);
+		child.once("close", (code) =>
+			code === 0
+				? finish()
+				: finish(new Error("Telegram bridge rejected the alert")),
+		);
+		child.stdin.end(text);
+	});
+}
+
+export async function deliverWatchlistAlerts(
+	config: AppConfig,
+	storage: RepoStorage,
+	notify: TelegramNotifier = sendTelegramAlert,
+): Promise<number> {
+	if (isTelegramQuietHours(config)) return 0;
+	let candidates: AlertCandidate[];
+	try {
+		candidates = await storage.queryAlertCandidates();
+	} catch (error) {
+		console.error(
+			"[alerts] candidate query failed:",
+			error instanceof Error ? error.message : error,
+		);
+		return 0;
+	}
+
+	let sent = 0;
+	for (const candidate of candidates) {
+		const signature = `${candidate.repo.id}:${candidate.snapshotAt}:${candidate.watchlist.alertThreshold}`;
+		if (await storage.hasAlertEvent(signature)) continue;
+		try {
+			await notify(config, formatTelegramAlert(candidate));
+			await storage.recordAlertEvent({
+				signature,
+				repoId: candidate.repo.id,
+				snapshotAt: candidate.snapshotAt,
+			});
+			sent += 1;
+		} catch (error) {
+			console.error(
+				`[alerts] ${candidate.repo.fullName} delivery failed:`,
+				error instanceof Error ? error.message : error,
+			);
+		}
+	}
+	return sent;
 }
 
 export async function runTrackingJob(
@@ -330,6 +566,8 @@ export async function runTrackingJob(
 			error instanceof Error ? error.message : error,
 		);
 	}
+
+	await deliverWatchlistAlerts(config, storage);
 }
 
 export function startServer(config: AppConfig = readConfig()) {

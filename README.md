@@ -44,11 +44,13 @@ Or make the package public (GitHub → Packages → reporadar → Package settin
 ## What it does
 
 - **Pulse** — the home dashboard: stats band (repos tracked, snapshots, stars gained), the #1 riser of the week, top risers, and freshly created repos at a glance.
-- **Search** (`/search`) — keyword + filters (language, min stars, created-since), sorted by stars/date/relevance. Live GitHub Search API.
+- **Search** (`/search`) — keyword + filters (language, topics, min stars, created-since, and recently pushed), sorted by stars/date/relevance. Live GitHub Search API with saved research presets.
 - **New** — repos created in the last 1/7/30 days.
 - **Fast Risers** — repos gaining the most stars over 1d/7d/30d, with velocity-per-day figures and inline sparklines. Computed from the hourly snapshots.
-- **Repo detail** (`/repo/:owner/:name`) — in-app page with metadata and an interactive star-history chart (7/30/90 days); tracked repos from the DB, anything else live from the GitHub API.
-- **Favourites** — star any repo to pin it; favourited repos are refreshed and snapshotted by the hourly job, so their velocity charts fill in automatically.
+- **Repo detail** (`/repo/:owner/:name`) — metadata, README, related repos, an interactive star-history chart (7/30/90 days), and a deterministic evidence brief; tracked repos come from the DB, anything else is live from GitHub.
+- **Compare** — select up to three repos from any list and get side-by-side momentum, evidence, size, activity, license, and topic signals plus a plain-English decision brief.
+- **Watchlist metadata** — tag, annotate, pause, archive, and bulk-edit watched repos.
+- **Telegram alerts** — opt in per repo with a star threshold; the hourly tracker deduplicates alerts, skips paused/archived repos, and honours optional quiet hours. This uses the external Telegram bridge, not browser notifications.
 - **Themes** — Aurora (default) / GitHub Dark / Tokyo Night / Light, toggleable in the sidebar.
 - **PWA** — installable on iPhone/iPad/Android home screens (standalone, full-screen, themed icon).
 
@@ -63,6 +65,7 @@ Every list supports keyboard navigation: `j` / `k` to move, `↵` to open, `/` t
 │  • /api/search   → live GitHub Search API    │
 │  • /api/risers   → computed from storage     │
 │  • /api/stats    → dashboard counters        │
+│  • /api/alerts/status → Telegram bridge      │
 │  • /api/repos/:id/history → star snapshots   │
 │  • node-cron: hourly star-tracking job       │
 └───────────────────┬─────────────────────────┘
@@ -86,6 +89,10 @@ Every list supports keyboard navigation: `j` / `k` to move, `↵` to open, `/` t
 | `POSTGRES_PASSWORD` | no | `postgres` | DB password |
 | `POSTGRES_DB` | no | `reporadar` | DB name |
 | `CRON_SCHEDULE` | no | `0 * * * *` | 5-field cron; hourly by default |
+| `REPORADAR_TELEGRAM_BRIDGE_CLI` | no | `~/.pi/agent/telegram-bridge/dist/outbound/cli.js` | Path to the external Telegram bridge CLI |
+| `REPORADAR_TELEGRAM_QUIET_START` | no | — | Local server hour (0–23) at which Telegram delivery starts being suppressed |
+| `REPORADAR_TELEGRAM_QUIET_END` | no | — | Local server hour (0–23) at which Telegram delivery resumes |
+| `REPORADAR_TELEGRAM_TIMEOUT_MS` | no | `30000` | Maximum time to wait for one bridge delivery |
 | `PORT` | no | `3000` | Host port |
 
 ## Development (without Docker)
@@ -103,6 +110,8 @@ npm run typecheck:api # typecheck API + server
 To run the server locally in lite mode: `REPORADAR_MODE=lite npm run server`.
 
 To run it against a local/distant Postgres: `POSTGRES_URL=postgres://... GITHUB_SERVER_TOKEN=... npm run server`.
+
+Telegram delivery is intentionally delegated to the bridge process. The server pipes one Markdown message to the CLI and records a dedupe event only after the CLI exits successfully. If the bridge is unavailable, the UI reports that state and the cron job logs the failure without marking the alert as sent.
 
 ## GitGlance migration
 

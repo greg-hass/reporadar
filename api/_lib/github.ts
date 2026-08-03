@@ -59,6 +59,7 @@ export interface SearchQuery {
 	topics?: string[];
 	minStars?: number;
 	createdSinceDays?: number;
+	pushedSinceDays?: number;
 	sort?: string;
 	page?: number;
 }
@@ -76,6 +77,12 @@ export async function githubSearch(
 			.toISOString()
 			.slice(0, 10);
 		parts.push(`created:>=${since}`);
+	}
+	if (query.pushedSinceDays) {
+		const since = new Date(Date.now() - query.pushedSinceDays * 86400_000)
+			.toISOString()
+			.slice(0, 10);
+		parts.push(`pushed:>=${since}`);
 	}
 	const q = encodeURIComponent(parts.join(" "));
 	const sort =

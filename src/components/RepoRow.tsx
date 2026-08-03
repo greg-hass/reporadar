@@ -18,10 +18,12 @@ interface Props {
   stagger?: number;
   /** right-hand block (stars, age, sparkline…) */
   right?: ReactNode;
+  /** optional control rendered between the rank and repo identity */
+  leading?: ReactNode;
 }
 
 /** The one row used by every list in the app — a standalone panel card. */
-export default function RepoRow({ repo, rank, selected, compact, stagger = 0, right }: Props) {
+export default function RepoRow({ repo, rank, selected, compact, stagger = 0, right, leading }: Props) {
   const navigate = useNavigate();
   const detailUrl = `/repo/${repo.fullName}`;
   const rich = !compact;
@@ -33,6 +35,7 @@ export default function RepoRow({ repo, rank, selected, compact, stagger = 0, ri
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       {rank !== undefined && <Rank n={rank} />}
+      {leading}
       <img
         src={repo.ownerAvatar}
         alt=""

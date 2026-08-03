@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { absolutizeUrls, githubSearch } from "./github";
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 });
 
@@ -57,5 +58,24 @@ describe("githubSearch", () => {
 			Accept: "application/vnd.github+json",
 			"X-GitHub-Api-Version": "2022-11-28",
 		});
+	});
+
+	it("includes topic and recent-push filters in the GitHub query", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"));
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(JSON.stringify({ total_count: 0, items: [] }), { status: 200 }),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await githubSearch(
+			{ q: "agent", topics: ["agents", "ai"], pushedSinceDays: 7 },
+			"",
+		);
+
+		const url = decodeURIComponent(String(fetchMock.mock.calls[0]?.[0]));
+		expect(url).toContain("topic:agents");
+		expect(url).toContain("topic:ai");
+		expect(url).toContain("pushed:>=2026-06-24");
 	});
 });

@@ -11,7 +11,12 @@ import { useRepo } from "../hooks/useRepo";
 import { useHistory } from "../hooks/useHistory";
 import { useReadme } from "../hooks/useReadme";
 import { useFavouriteIds, useToggleFavourite } from "../hooks/useFavourites";
-import { compactNumber, relativeTime, safeExternalUrl } from "../lib/format";
+import {
+  buildRepoDecisionSummary,
+  compactNumber,
+  relativeTime,
+  safeExternalUrl,
+} from "../lib/format";
 import CompareButton from "../components/CompareButton";
 import RelatedRepos from "../components/RelatedRepos";
 
@@ -86,6 +91,9 @@ export default function RepoDetailPage() {
     : 0;
   const windowLimited = tracked && spanDays + 0.5 < Number(days);
   const trendDelta = tracked ? points[points.length - 1].stars - points[0].stars : null;
+  const decisionSummary = repo
+    ? buildRepoDecisionSummary(repo, points, Number(days))
+    : null;
   const fmtDay = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
@@ -194,6 +202,9 @@ export default function RepoDetailPage() {
                 {trendDelta && trendDelta > 0 ? "Gaining attention" : "Worth a closer look"}
               </span>
             </div>
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-muted">
+              {decisionSummary}
+            </p>
             <div className="grid grid-cols-2 gap-2.5 mt-4 sm:grid-cols-4">
               <div className="rounded-xl bg-elevated/60 p-3">
                 <div className="eyebrow !text-[8px]">Momentum</div>

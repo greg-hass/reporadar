@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Repo } from "../lib/types";
 import Sparkline from "./Sparkline";
@@ -17,10 +17,11 @@ interface Props {
   window: string; // "1d" | "7d" | "30d", shown next to the total delta
   selected: boolean;
   stagger: number;
+  leading?: ReactNode;
 }
 
 /** Leaderboard row for Fast Risers: identity + trajectory + velocity hero. */
-export default function RiserRow({ repo, rank, windowDays, window, selected, stagger }: Props) {
+export default function RiserRow({ repo, rank, windowDays, window, selected, stagger, leading }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const detailUrl = `/repo/${repo.fullName}`;
@@ -40,6 +41,7 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       <Rank n={rank} />
+      {leading}
 
       <img
         src={repo.ownerAvatar}
