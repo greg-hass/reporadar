@@ -63,7 +63,7 @@ function getPool(connStr: string): Pool {
 	return pool;
 }
 
-// Schema DDL — keep in sync with supabase/migrations/001_init.sql.
+// Schema DDL — keep in sync with migrations/001_init.sql.
 // Applied automatically at server startup so fresh deployments self-provision
 // (all statements are idempotent).
 const SCHEMA_SQL = `

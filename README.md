@@ -21,7 +21,7 @@ docker compose up -d --build
 open http://localhost:3000
 ```
 
-Durable mode uses Postgres and a server-side token for hourly tracking. The database schema is applied automatically on startup. Risers become meaningful after the tracker has run on at least two different hours.
+Durable mode uses Postgres and a server-side token for hourly tracking. The database schema is applied automatically on startup. The portable SQL files live in `migrations/`; for a manual recovery or bootstrap run, set `POSTGRES_URL` and run `node scripts/run-migrations.mjs`. Risers become meaningful after the tracker has run on at least two different hours.
 
 ## Updating (prebuilt image from GHCR)
 
