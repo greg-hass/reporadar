@@ -45,6 +45,17 @@ const DEFAULT_TELEGRAM_BRIDGE_CLI = path.resolve(
 	"cli.js",
 );
 
+export function resolveDistDir(serverDir = __dirname): string {
+	const candidates = [
+		path.resolve(serverDir, "..", "dist"),
+		path.resolve(serverDir, "..", "..", "dist"),
+	];
+	return (
+		candidates.find((candidate) => existsSync(path.join(candidate, "index.html"))) ??
+		candidates[0]
+	);
+}
+
 function optionalHour(value: string | undefined): number | undefined {
 	const parsed = Number(value);
 	return Number.isInteger(parsed) && parsed >= 0 && parsed < 24
@@ -359,7 +370,7 @@ export function createApp(
 		}
 	});
 
-	const distDir = path.resolve(__dirname, "..", "dist");
+	const distDir = resolveDistDir();
 	app.use(express.static(distDir));
 	app.get("*", (_req, res) => {
 		res.sendFile(path.join(distDir, "index.html"));

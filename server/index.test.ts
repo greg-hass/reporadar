@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import {
 	createApp,
 	deliverWatchlistAlerts,
 	isTelegramQuietHours,
+	resolveDistDir,
 	runTrackingJob,
 	sendTelegramAlert,
 	type AppConfig,
@@ -61,6 +62,20 @@ async function listen(app: ReturnType<typeof createApp>): Promise<string> {
 }
 
 describe("RepoRadar API", () => {
+	it("resolves frontend assets from source and compiled server layouts", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-dist-"));
+		tempDirs.push(dir);
+		await mkdir(path.join(dir, "dist"), { recursive: true });
+		await writeFile(path.join(dir, "dist", "index.html"), "<!doctype html>");
+
+		expect(resolveDistDir(path.join(dir, "server"))).toBe(
+			path.join(dir, "dist"),
+		);
+		expect(resolveDistDir(path.join(dir, "dist-server", "server"))).toBe(
+			path.join(dir, "dist"),
+		);
+	});
+
 	it("sends Markdown through the configured bridge CLI", async () => {
 		const dir = await mkdtemp(
 			path.join(os.tmpdir(), "reporadar-telegram-cli-"),
