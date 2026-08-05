@@ -13,7 +13,6 @@ import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 import { safeExternalUrl } from "../lib/format";
 import PageHeader from "../components/PageHeader";
-import ChangeInbox from "../components/ChangeInbox";
 import { TrendingUpIcon } from "../components/icons";
 
 type Window = "1d" | "7d" | "30d";
@@ -48,8 +47,6 @@ export default function RisersPage() {
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
       <div className="radar-bg" aria-hidden="true" />
-
-      <ChangeInbox />
 
       <PageHeader
         icon={TrendingUpIcon}
