@@ -128,6 +128,22 @@ describe("LiteStore", () => {
 		});
 	});
 
+	it("keeps watchlist repos out of global Trending", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-lite-"));
+		tempDirs.push(dir);
+		const store = new LiteStore(dir);
+		const globalRepo = { ...repo, id: 43, fullName: "other/owner" };
+
+		await store.upsertAndSnapshot([repo]);
+		await store.addFavourite(repo);
+		await store.upsertAndSnapshot([globalRepo]);
+
+		const result = await store.queryRisers(7, 50);
+
+		expect(result.total).toBe(1);
+		expect(result.items.map((item) => item.id)).toEqual([globalRepo.id]);
+	});
+
 	it("returns watchlist changes and new signals since the last visit", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"));

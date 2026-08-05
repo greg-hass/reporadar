@@ -240,9 +240,11 @@ export class LiteStore implements RepoStorage {
 		total: number;
 	}> {
 		const latest = this.latestSnapshots();
+		const watchlist = new Set(this.state.favourites.map((favourite) => favourite.id));
 		const cutoff = Date.now() - windowDays * 86_400_000;
 		const repos = new Map(this.state.repos.map((repo) => [repo.id, repo]));
 		const rows = [...latest.entries()]
+			.filter(([repoId]) => !watchlist.has(repoId))
 			.map(([repoId, current]) => {
 				const past = this.state.snapshots
 					.filter(

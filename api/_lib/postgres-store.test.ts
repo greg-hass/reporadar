@@ -228,9 +228,11 @@ describe("Postgres storage", () => {
 		const risersSql = String(poolQuery.mock.calls[0]?.[0]).replace(/\s+/g, " ");
 		expect(risersSql).toContain("DISTINCT ON (repo_id)");
 		expect(risersSql).toContain("ORDER BY repo_id, captured_at DESC");
+		expect(risersSql).toContain("NOT EXISTS");
 		expect(risersSql).not.toContain("captured_at = (SELECT MAX(captured_at)");
 		expect(String(poolQuery.mock.calls[2]?.[0])).toContain(
-			"COUNT(DISTINCT repo_id)",
+			"COUNT(DISTINCT ss.repo_id)",
 		);
+		expect(String(poolQuery.mock.calls[2]?.[0])).toContain("NOT EXISTS");
 	});
 });

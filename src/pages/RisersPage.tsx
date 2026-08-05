@@ -9,38 +9,28 @@ import RepoListSkeleton from "../components/Skeleton";
 import LoadMore from "../components/LoadMore";
 import { EmptyState, ErrorState } from "../components/States";
 import { useRisers } from "../hooks/useRisers";
-import { useFavourites } from "../hooks/useFavourites";
 import { useDensity } from "../hooks/useDensity";
 import { useRovingKeys } from "../hooks/useRovingKeys";
 import { safeExternalUrl } from "../lib/format";
-import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import ChangeInbox from "../components/ChangeInbox";
 import { TrendingUpIcon } from "../components/icons";
 
 type Window = "1d" | "7d" | "30d";
-type Scope = "global" | "watchlist";
 const WINDOW_OPTIONS: { value: Window; label: string }[] = [
   { value: "1d", label: "24h" },
   { value: "7d", label: "7 days" },
   { value: "30d", label: "30 days" },
 ];
 const WINDOW_DAYS: Record<Window, number> = { "1d": 1, "7d": 7, "30d": 30 };
-const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
-  { value: "global", label: "Global GitHub" },
-  { value: "watchlist", label: "Watchlist" },
-];
 
 export default function RisersPage() {
   const [win, setWin] = useState<Window>("7d");
-  const [scope, setScope] = useState<Scope>("global");
   const [density, setDensity] = useDensity();
-  const global = useRisers(win);
-  const watchlist = useFavourites(win);
-  const active = scope === "global" ? global : watchlist;
+  const risers = useRisers(win);
 
-  const items = scope === "global" ? global.data?.pages.flatMap((p) => p.items) ?? [] : watchlist.data?.items ?? [];
-  const total = scope === "global" ? global.data?.pages[0]?.total : watchlist.data?.total;
+  const items = risers.data?.pages.flatMap((p) => p.items) ?? [];
+  const total = risers.data?.pages[0]?.total;
   // #1 gets the hero spotlight; the list starts at #2 and paginates from there.
   const hero = items[0];
   const rest = items.slice(1);
@@ -63,49 +53,36 @@ export default function RisersPage() {
 
       <PageHeader
         icon={TrendingUpIcon}
-        eyebrow={`${scope === "global" ? "Global GitHub signals" : "Watchlist signals"} · last ${win}`}
+        eyebrow={`Global GitHub signals · last ${win}`}
         title="Trending"
-        description={scope === "global" ? "Fast risers from the tracked GitHub discovery set" : "Repos on your watchlist, ranked by momentum"}
+        description="Fast risers from the tracked GitHub discovery set"
         actions={(
-          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <div className="w-full sm:w-auto">
-              <SegmentedControl value={scope} options={SCOPE_OPTIONS} onChange={setScope} ariaLabel="Trending scope" />
+          <div className="flex w-full min-w-0 gap-2 sm:w-auto">
+            <div className="min-w-0 flex-[1.65] sm:flex-none">
+              <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
             </div>
-            <div className="flex w-full min-w-0 gap-2 sm:w-auto">
-              <div className="min-w-0 flex-[1.65] sm:flex-none">
-                <SegmentedControl value={win} options={WINDOW_OPTIONS} onChange={changeWindow} ariaLabel="Time window" />
-              </div>
-              <div className="min-w-0 flex-1 sm:flex-none">
-                <DensityToggle value={density} onChange={setDensity} />
-              </div>
+            <div className="min-w-0 flex-1 sm:flex-none">
+              <DensityToggle value={density} onChange={setDensity} />
             </div>
           </div>
         )}
       />
 
-      {active.isLoading ? (
+      {risers.isLoading ? (
         <RepoListSkeleton />
-      ) : active.error ? (
-        <ErrorState message={(active.error as Error).message} onRetry={() => active.refetch()} />
+      ) : risers.error ? (
+        <ErrorState message={(risers.error as Error).message} onRetry={() => risers.refetch()} />
       ) : !hero ? (
         <EmptyState
-          title={scope === "watchlist" ? "Your watchlist is empty" : "No risers yet"}
-          hint={scope === "watchlist"
-            ? "Add repos to your watchlist and come back here to see their momentum side by side."
-            : "Risers appear after the hourly snapshot job has run at least twice."}
-        >
-          {scope === "watchlist" && (
-            <Link to="/search" className="btn-primary px-4 py-2 text-xs mt-4">
-              Find repos to watch
-            </Link>
-          )}
-        </EmptyState>
+          title="No risers yet"
+          hint="Risers appear after the hourly snapshot job has run at least twice."
+        />
       ) : (
         <>
           <HeroRiser repo={hero} windowDays={WINDOW_DAYS[win]} />
           {total !== undefined && (
             <p className="text-[11px] text-muted px-1">
-              Showing {items.length} of {total.toLocaleString()} {scope === "global" ? "tracked repos" : "watchlist repos"}
+              Showing {items.length} of {total.toLocaleString()} tracked repos
             </p>
           )}
           {rest.length > 0 && (
@@ -142,14 +119,12 @@ export default function RisersPage() {
               )}
             </div>
           )}
-          {scope === "global" && (
-            <LoadMore
-              hasNextPage={global.hasNextPage ?? false}
-              isFetchingNextPage={global.isFetchingNextPage}
-              fetchNextPage={global.fetchNextPage}
-              loaded={items.length}
-            />
-          )}
+          <LoadMore
+            hasNextPage={risers.hasNextPage ?? false}
+            isFetchingNextPage={risers.isFetchingNextPage}
+            fetchNextPage={risers.fetchNextPage}
+            loaded={items.length}
+          />
           <p className="hidden md:block text-[11px] text-muted text-right">
             <kbd className="border border-border rounded px-1">j</kbd>{" "}
             <kbd className="border border-border rounded px-1">k</kbd> navigate ·{" "}

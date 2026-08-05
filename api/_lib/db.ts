@@ -190,7 +190,7 @@ export async function queryRisers(
 	offset = 0,
 ): Promise<{
 	items: (NormalizedRepo & { starDelta: number; history: number[] })[];
-	/** total repos in the latest snapshot (i.e. how many risers exist overall) */
+	/** total non-watchlist repos in the latest snapshot */
 	total: number;
 }> {
 	const pool = getPool(connStr);
@@ -218,6 +218,9 @@ export async function queryRisers(
        FROM latest
        JOIN repos r ON r.id = latest.repo_id
        LEFT JOIN past ON past.repo_id = latest.repo_id
+       WHERE NOT EXISTS (
+         SELECT 1 FROM favourites f WHERE f.repo_id = latest.repo_id
+       )
        ORDER BY delta DESC
        LIMIT $2 OFFSET $3`,
 		[String(windowDays), limit, offset],
@@ -239,7 +242,11 @@ export async function queryRisers(
 	}
 	// pi-lens-ignore: no-sql-in-code
 	const countRes = await pool.query(
-		`SELECT COUNT(DISTINCT repo_id)::int AS n FROM star_snapshots`,
+		`SELECT COUNT(DISTINCT ss.repo_id)::int AS n
+         FROM star_snapshots ss
+         WHERE NOT EXISTS (
+           SELECT 1 FROM favourites f WHERE f.repo_id = ss.repo_id
+         )`,
 	);
 	return {
 		items: rows.map((r) => ({
