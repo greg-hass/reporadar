@@ -114,7 +114,7 @@ export default function SearchPage() {
               <button
                 key={ex}
                 onClick={() => patch({ q: ex })}
-                className="text-xs px-3.5 py-2 rounded-full bg-surface border border-border text-muted hover:text-text hover:border-primary/50 transition-colors"
+                className="text-xs px-3.5 py-2 rounded-full bg-surface text-muted hover:bg-elevated hover:text-text transition-colors"
               >
                 {ex}
               </button>

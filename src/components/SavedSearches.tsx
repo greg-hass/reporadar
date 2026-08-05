@@ -25,7 +25,7 @@ export default function SavedSearches({ query, onApply }: { query: QueryState; o
         <button
           type="button"
           onClick={() => save({ ...query, label: query.q })}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1.5 text-[11px] text-muted hover:border-primary/50 hover:text-text transition-colors"
+          className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1.5 text-[11px] text-muted hover:bg-elevated hover:text-text transition-colors"
         >
           {isSaved ? <CheckIcon size={12} className="text-accent" /> : <CopyIcon size={12} />}
           {isSaved ? "Saved" : "Save this search"}
