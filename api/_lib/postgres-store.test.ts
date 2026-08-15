@@ -8,10 +8,12 @@ const poolConnect = vi.hoisted(() =>
 );
 
 vi.mock("pg", () => ({
-	Pool: vi.fn(() => ({
-		query: poolQuery,
-		connect: poolConnect,
-	})),
+	Pool: vi.fn(function poolInstance() {
+		return {
+			query: poolQuery,
+			connect: poolConnect,
+		};
+	}),
 	types: { builtins: { INT8: 20 }, setTypeParser: vi.fn() },
 }));
 
