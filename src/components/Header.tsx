@@ -7,7 +7,7 @@ import { SettingsIcon } from "./icons";
 /** Sticky top bar for tablets and phones (hidden on desktop). */
 export default function Header() {
   return (
-    <header className="lg:hidden sticky top-0 z-40 bg-bg/80 backdrop-blur pt-[env(safe-area-inset-top)]">
+    <header className="lg:hidden sticky top-0 z-40 bg-bg pt-[env(safe-area-inset-top)]">
       <div className="flex items-center gap-2.5 px-4 h-14">
         <Logo size={24} />
         <span className="font-extrabold tracking-tight">RepoRadar</span>
