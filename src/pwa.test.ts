@@ -13,12 +13,11 @@ describe("PWA shell metadata", () => {
     expect(manifest.background_color).toBe("#0b0c1d");
   });
 
-  it("uses an opaque iOS status bar for the installed PWA", () => {
+  it("lets the app background continue behind the installed PWA status bar", () => {
     const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
     expect(indexHtml).toContain(
-      'apple-mobile-web-app-status-bar-style" content="black"',
+      'apple-mobile-web-app-status-bar-style" content="black-translucent"',
     );
-    expect(indexHtml).not.toContain("black-translucent");
   });
 });
