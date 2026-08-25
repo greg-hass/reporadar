@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useStats } from "../hooks/useStats";
-import { compactNumber, relativeTime } from "../lib/format";
+import { useTicker } from "../hooks/useTicker";
+import { compactNumber, minutesToNextHour, relativeTime } from "../lib/format";
 
 /** The Observatory stats band: tracked repos, snapshots, stars gained, last run. */
 export default function StatsBand({ compactOnMobile = false }: { compactOnMobile?: boolean }) {
   const { data, isLoading, error } = useStats();
   const [open, setOpen] = useState(false);
+  // Re-render every 30s so the relative timestamp and next-run countdown tick live.
+  useTicker(30_000);
 
   const cell = (label: string, value: React.ReactNode) => (
     <div className="stat-panel">
@@ -88,6 +91,7 @@ export default function StatsBand({ compactOnMobile = false }: { compactOnMobile
           <>
             <span className="pulse-dot" />
             <span className="text-base">{relativeTime(data.lastSnapshotAt)}</span>
+            <span className="text-muted text-xs">· next in {minutesToNextHour()}m</span>
           </>
         ) : (
           <span className="text-muted text-sm">no snapshots yet</span>

@@ -39,6 +39,11 @@ export function relativeTime(iso: string): string {
   return `${Math.floor(hours / 24)} d ago`;
 }
 
+/** Minutes until the top of the next hour, when the hourly tracker fires. */
+export function minutesToNextHour(now = new Date()): number {
+  return 60 - now.getMinutes();
+}
+
 export function buildRepoDecisionSummary(
   repo: Repo,
   points: HistoryPoint[],

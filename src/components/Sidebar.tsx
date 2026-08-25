@@ -3,10 +3,13 @@ import { NAV_TABS } from "./nav";
 import { Logo, SettingsIcon } from "./icons";
 import ThemeToggle from "./ThemeToggle";
 import { useStats } from "../hooks/useStats";
-import { relativeTime } from "../lib/format";
+import { useTicker } from "../hooks/useTicker";
+import { minutesToNextHour, relativeTime } from "../lib/format";
 
 export default function Sidebar() {
   const { data } = useStats();
+  // Keep the relative timestamp ticking between stats refetches.
+  useTicker();
 
   return (
     <aside className="hidden lg:flex w-[232px] shrink-0 flex-col bg-surface/40 backdrop-blur sticky top-0 h-screen p-4">
@@ -58,6 +61,7 @@ export default function Sidebar() {
               <>
                 <span className="pulse-dot" />
                 {relativeTime(data.lastSnapshotAt)}
+                <span className="text-muted">· next in {minutesToNextHour()}m</span>
               </>
             ) : (
               <span className="text-muted">—</span>

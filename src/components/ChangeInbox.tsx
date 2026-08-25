@@ -4,6 +4,7 @@ import { compactNumber, relativeTime } from "../lib/format";
 import { InboxIcon, XIcon } from "./icons";
 import RepoRow from "./RepoRow";
 import { usePulse } from "../hooks/usePulse";
+import { useTicker } from "../hooks/useTicker";
 
 const DISMISSED_KEY = "reporadar-pulse-dismissed";
 
@@ -188,6 +189,8 @@ function PulseBody({
 
 export default function ChangeInbox() {
   const { data, isLoading, error, refetch, hasSeen, markSeen } = usePulse();
+  // Re-render periodically so "updated N min ago" labels stay live.
+  useTicker();
   const [dismissed, setDismissed] = useState<string[]>(() => readDismissed());
 
   useEffect(() => {
