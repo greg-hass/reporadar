@@ -3,9 +3,23 @@ services:
     build: .
     image: reporadar:lite
     restart: unless-stopped
+    init: true
+    user: node
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
+    mem_limit: 512m
+    cpus: 0.75
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
     ports:
       - "${PORT:-3000}:3000"
     environment:
+      REPORADAR_AUTH_USER: ${REPORADAR_AUTH_USER:?set REPORADAR_AUTH_USER}
+      REPORADAR_AUTH_PASSWORD: ${REPORADAR_AUTH_PASSWORD:?set REPORADAR_AUTH_PASSWORD}
       REPORADAR_MODE: lite
       REPORADAR_DATA_DIR: /app/data
       CRON_SCHEDULE: ${CRON_SCHEDULE:-0 * * * *}

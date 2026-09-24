@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { Repo } from "../lib/types";
 import { compactNumber, safeExternalUrl } from "../lib/format";
 import { ExternalLinkIcon, ForkIcon, StarIcon } from "./icons";
@@ -24,14 +24,12 @@ interface Props {
 
 /** The one row used by every list in the app — a standalone panel card. */
 export default function RepoRow({ repo, rank, selected, compact, stagger = 0, right, leading }: Props) {
-  const navigate = useNavigate();
   const detailUrl = `/repo/${repo.fullName}`;
   const rich = !compact;
 
   return (
     <div
-      onClick={() => navigate(detailUrl)}
-      className={`panel panel-row ${rich ? "panel-row-rich" : ""} cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      className={`panel panel-row ${rich ? "panel-row-rich" : ""} ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       {rank !== undefined && <Rank n={rank} />}
@@ -46,7 +44,6 @@ export default function RepoRow({ repo, rank, selected, compact, stagger = 0, ri
         <span className={`flex gap-1.5 min-w-0 ${rich ? "items-start" : "items-center"}`}>
           <Link
             to={detailUrl}
-            onClick={(e) => e.stopPropagation()}
             className={`min-w-0 font-semibold text-text hover:text-primary transition-colors ${
               rich
                 ? "repo-name-rich line-clamp-2 text-base leading-snug"
@@ -61,10 +58,9 @@ export default function RepoRow({ repo, rank, selected, compact, stagger = 0, ri
             href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
             target="_blank"
             rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
             aria-label={`Open ${repo.fullName} on GitHub`}
             title="Open on GitHub"
-            className="shrink-0 text-muted/50 hover:text-text transition-colors"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted/50 hover:text-text transition-colors"
           >
             <ExternalLinkIcon size={13} />
           </a>

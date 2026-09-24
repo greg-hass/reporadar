@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { Repo } from "../lib/types";
 import Sparkline from "./Sparkline";
 import LanguageDot from "./LanguageDot";
@@ -23,7 +23,6 @@ interface Props {
 /** Leaderboard row for Fast Risers: identity + trajectory + velocity hero. */
 export default function RiserRow({ repo, rank, windowDays, window, selected, stagger, leading }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
   const detailUrl = `/repo/${repo.fullName}`;
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
@@ -36,8 +35,7 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
   return (
     <div
       ref={ref}
-      onClick={() => navigate(detailUrl)}
-      className={`panel panel-row panel-row-rich cursor-pointer ${selected ? "panel-row-selected" : ""} animate-fade-up`}
+      className={`panel panel-row panel-row-rich ${selected ? "panel-row-selected" : ""} animate-fade-up`}
       style={{ animationDelay: `${Math.min(stagger, 12) * 40}ms` }}
     >
       <Rank n={rank} />
@@ -54,7 +52,6 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
         <span className="flex items-start gap-1.5 min-w-0">
           <Link
             to={detailUrl}
-            onClick={(e) => e.stopPropagation()}
             className="repo-name-rich min-w-0 line-clamp-2 font-semibold text-base leading-snug text-text hover:text-primary transition-colors"
           >
             {repo.fullName}
@@ -65,10 +62,9 @@ export default function RiserRow({ repo, rank, windowDays, window, selected, sta
             href={safeExternalUrl(repo.htmlUrl, repo.fullName)}
             target="_blank"
             rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
             aria-label={`Open ${repo.fullName} on GitHub`}
             title="Open on GitHub"
-            className="shrink-0 text-muted/50 hover:text-text transition-colors"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted/50 hover:text-text transition-colors"
           >
             <ExternalLinkIcon size={13} />
           </a>

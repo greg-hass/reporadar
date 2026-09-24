@@ -39,7 +39,14 @@ function asHttpUrl(value: unknown, fallback: string): string {
 	if (typeof value === "string") {
 		try {
 			const url = new URL(value);
-			if (url.protocol === "https:" || url.protocol === "http:") {
+			if (
+				url.protocol === "https:" &&
+				(url.hostname === "avatars.githubusercontent.com" ||
+					url.hostname === "github.com") &&
+				!url.username &&
+				!url.password &&
+				!url.port
+			) {
 				return url.toString();
 			}
 		} catch {
@@ -47,6 +54,13 @@ function asHttpUrl(value: unknown, fallback: string): string {
 		}
 	}
 	return fallback;
+}
+
+function asIsoDate(value: unknown, fallback: string): string | null {
+	if (value === undefined || value === null || value === "") return fallback;
+	if (typeof value !== "string") return null;
+	const timestamp = Date.parse(value);
+	return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 function sanitizeTopics(value: unknown): string[] {
@@ -131,6 +145,9 @@ export function sanitizeFavouritePayload(
 	const owner = fullName.split("/")[0];
 	const nowIso = new Date().toISOString();
 	const topics = sanitizeTopics(body.topics);
+	const createdAt = asIsoDate(body.createdAt, nowIso);
+	const pushedAt = asIsoDate(body.pushedAt, nowIso);
+	if (!createdAt || !pushedAt) return null;
 
 	return {
 		id,
@@ -140,8 +157,8 @@ export function sanitizeFavouritePayload(
 		topics,
 		starsTotal: asNonNegativeInt(body.starsTotal, MAX_STARS),
 		forks: asNonNegativeInt(body.forks, MAX_STARS),
-		createdAt: asText(body.createdAt, 40) ?? nowIso,
-		pushedAt: asText(body.pushedAt, 40) ?? nowIso,
+		createdAt,
+		pushedAt,
 		license: asText(body.license, MAX_TEXT),
 		ownerAvatar: asHttpUrl(body.ownerAvatar, `https://github.com/${owner}.png`),
 		// The one field that becomes an href in the UI — never trust the client.

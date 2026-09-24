@@ -33,7 +33,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 20
+          node-version: 24.21.0
           cache: npm
 
       - run: npm ci
@@ -149,3 +149,11 @@ jobs:
 
       - name: Inspect image
         run: docker buildx imagetools inspect ${{ env.IMAGE }}:latest
+
+      - name: Print immutable deployment reference
+        env:
+          IMAGE: ${{ env.IMAGE }}
+        run: |
+          digest="$(docker buildx imagetools inspect "$IMAGE:latest" --format '{{.Manifest.Digest}}')"
+          echo "Deploy this reviewed image in Dockge:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$IMAGE@$digest\`" >> "$GITHUB_STEP_SUMMARY"

@@ -4,6 +4,7 @@ import {
 	ensureSchema,
 	hasAlertEvent,
 	listFavouriteIds,
+	listFavouriteIdsForRefresh,
 	queryAlertCandidates,
 	queryFavourites,
 	queryHistory,
@@ -11,6 +12,7 @@ import {
 	queryPulse,
 	queryRisers,
 	queryStats,
+	markFavouriteUnavailable,
 	recordAlertEvent,
 	removeFavourite,
 	updateFavourites,
@@ -42,6 +44,8 @@ export interface RepoStorage {
 	queryHistory(repoId: number, days: number): Promise<HistoryPoint[]>;
 	queryRepoByName(fullName: string): Promise<NormalizedRepo | null>;
 	listFavouriteIds(): Promise<number[]>;
+	listFavouriteIdsForRefresh(): Promise<number[]>;
+	markFavouriteUnavailable(repoId: number): Promise<void>;
 	addFavourite(repo: NormalizedRepo): Promise<void>;
 	removeFavourite(repoId: number): Promise<void>;
 	updateFavourites(repoIds: number[], patch: FavouritePatch): Promise<void>;
@@ -88,6 +92,14 @@ class PostgresStore implements RepoStorage {
 
 	listFavouriteIds() {
 		return listFavouriteIds(this.connStr);
+	}
+
+	listFavouriteIdsForRefresh() {
+		return listFavouriteIdsForRefresh(this.connStr);
+	}
+
+	markFavouriteUnavailable(repoId: number) {
+		return markFavouriteUnavailable(this.connStr, repoId);
 	}
 
 	addFavourite(repo: NormalizedRepo) {

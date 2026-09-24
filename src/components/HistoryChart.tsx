@@ -11,12 +11,16 @@ export default function HistoryChart({ points }: { points: HistoryPoint[] }) {
   const ref = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
+  if (points.length === 0) {
+    return <p className="py-8 text-center text-sm text-muted">No star history yet.</p>;
+  }
+
   const max = Math.max(...points.map((p) => p.stars));
   const min = Math.min(...points.map((p) => p.stars));
   const range = max - min || 1;
-  const stepX = (W - PAD * 2) / (points.length - 1);
+  const stepX = points.length > 1 ? (W - PAD * 2) / (points.length - 1) : 0;
   const coords = points.map((p, i): [number, number] => [
-    PAD + i * stepX,
+    points.length > 1 ? PAD + i * stepX : W / 2,
     H - PAD - ((p.stars - min) / range) * (H - PAD * 2 - 20),
   ]);
   const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
@@ -29,6 +33,18 @@ export default function HistoryChart({ points }: { points: HistoryPoint[] }) {
     setHover(Math.round(frac * (points.length - 1)));
   };
 
+  const onKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
+    const current = hover ?? points.length - 1;
+    let next = current;
+    if (e.key === "ArrowLeft") next = Math.max(0, current - 1);
+    else if (e.key === "ArrowRight") next = Math.min(points.length - 1, current + 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = points.length - 1;
+    else return;
+    e.preventDefault();
+    setHover(next);
+  };
+
   const hp = hover !== null ? points[hover] : null;
   const hc = hover !== null ? coords[hover] : null;
 
@@ -37,11 +53,19 @@ export default function HistoryChart({ points }: { points: HistoryPoint[] }) {
       <svg
         ref={ref}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto block touch-none"
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
-        role="img"
-        aria-label="Star history chart"
+        onKeyDown={onKeyDown}
+        onFocus={() => setHover(points.length - 1)}
+        role="slider"
+        tabIndex={0}
+        aria-label="Star history; use the arrow keys to explore points"
+        aria-orientation="horizontal"
+        aria-valuemin={min}
+        aria-valuemax={Math.max(min + 1, max)}
+        aria-valuenow={hp?.stars ?? points[points.length - 1].stars}
+        aria-valuetext={`${(hp ?? points[points.length - 1]).stars.toLocaleString()} stars on ${new Date((hp ?? points[points.length - 1]).t).toLocaleString()}`}
+        className="w-full h-auto block touch-none rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">

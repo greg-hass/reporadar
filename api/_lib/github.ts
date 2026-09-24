@@ -92,7 +92,10 @@ export async function githubSearch(
 	const page = query.page ? `&page=${query.page}` : "";
 	const url = `${GITHUB_API}/search/repositories?q=${q}&per_page=30${sort}${page}`;
 
-	const res = await fetch(url, { headers: HEADERS(token) });
+	const res = await fetch(url, {
+		headers: HEADERS(token),
+		signal: AbortSignal.timeout(15_000),
+	});
 	if (!res.ok) {
 		throw new Error(`GitHub ${res.status}: ${await res.text()}`);
 	}
@@ -110,6 +113,7 @@ export async function githubRepo(
 		`${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
 		{
 			headers: HEADERS(token),
+			signal: AbortSignal.timeout(15_000),
 		},
 	);
 	if (!res.ok) {
@@ -125,6 +129,7 @@ export async function githubRepoById(
 ): Promise<NormalizedRepo> {
 	const res = await fetch(`${GITHUB_API}/repositories/${id}`, {
 		headers: HEADERS(token),
+		signal: AbortSignal.timeout(15_000),
 	});
 	if (!res.ok) {
 		throw new Error(`GitHub ${res.status}: ${await res.text()}`);
@@ -185,6 +190,7 @@ export async function githubReadme(
 		`${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/readme`,
 		{
 			headers: { ...HEADERS(token), Accept: "application/vnd.github.html" },
+			signal: AbortSignal.timeout(15_000),
 		},
 	);
 	if (res.status === 404) return null;

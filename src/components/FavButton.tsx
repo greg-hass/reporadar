@@ -18,7 +18,7 @@ export default function FavButton({ repo, size = 15 }: { repo: Repo; size?: numb
       aria-label={fav ? `Remove ${repo.fullName} from favourites` : `Add ${repo.fullName} to favourites`}
       aria-pressed={fav}
       title={fav ? "Remove from favourites" : "Favourite — tracked hourly"}
-      className={`shrink-0 transition-colors ${fav ? "text-accent" : "text-muted/50 hover:text-accent"}`}
+      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${fav ? "text-accent" : "text-muted/50 hover:text-accent"}`}
     >
       <StarIcon size={size} fill={fav ? "currentColor" : "none"} />
     </button>

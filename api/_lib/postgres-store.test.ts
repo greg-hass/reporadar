@@ -22,6 +22,7 @@ import {
 	recordAlertEvent,
 	queryAlertCandidates,
 	queryPulse,
+	queryFavourites,
 	queryRepoByName,
 	queryRisers,
 	updateFavourites,
@@ -229,6 +230,8 @@ describe("Postgres storage", () => {
 		});
 		const risersSql = String(poolQuery.mock.calls[0]?.[0]).replace(/\s+/g, " ");
 		expect(risersSql).toContain("DISTINCT ON (repo_id)");
+		expect(risersSql).toContain("WITH latest AS MATERIALIZED (");
+		expect(risersSql).toContain("past AS MATERIALIZED (");
 		expect(risersSql).toContain("ORDER BY repo_id, captured_at DESC");
 		expect(risersSql).toContain("NOT EXISTS");
 		expect(risersSql).not.toContain("captured_at = (SELECT MAX(captured_at)");
@@ -236,5 +239,12 @@ describe("Postgres storage", () => {
 			"COUNT(DISTINCT ss.repo_id)",
 		);
 		expect(String(poolQuery.mock.calls[2]?.[0])).toContain("NOT EXISTS");
+	});
+
+	it("guards legacy favourite timestamp casts with PostgreSQL validation", async () => {
+		poolQuery.mockResolvedValueOnce({ rows: [] });
+		await queryFavourites("postgres://postgres:postgres@db:5432/reporadar", 7);
+		const sql = String(poolQuery.mock.calls[0]?.[0]);
+		expect(sql.match(/pg_input_is_valid\(f\.payload->>'(?:createdAt|pushedAt)'/g)).toHaveLength(2);
 	});
 });

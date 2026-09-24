@@ -27,10 +27,10 @@ describe("sanitizeFavouritePayload", () => {
 			topics: ["github", "react"],
 			starsTotal: 12,
 			forks: 2,
-			createdAt: "2026-01-01T00:00:00Z",
-			pushedAt: "2026-01-02T00:00:00Z",
+			createdAt: "2026-01-01T00:00:00.000Z",
+			pushedAt: "2026-01-02T00:00:00.000Z",
 			license: "MIT",
-			ownerAvatar: "https://example.com/avatar.png",
+			ownerAvatar: "https://github.com/greg-hass.png",
 			htmlUrl: "https://github.com/greg-hass/reporadar",
 		});
 	});
@@ -43,12 +43,30 @@ describe("sanitizeFavouritePayload", () => {
 		expect(out?.htmlUrl).toBe("https://github.com/greg-hass/reporadar");
 	});
 
-	it("falls back to the GitHub avatar URL when ownerAvatar is not http(s)", () => {
+	it("falls back to GitHub when ownerAvatar is not a trusted HTTPS GitHub URL", () => {
 		const out = sanitizeFavouritePayload(
-			{ ...benign, ownerAvatar: "javascript:alert(1)" },
+			{ ...benign, ownerAvatar: "https://example.com/avatar.png" },
 			42,
 		);
 		expect(out?.ownerAvatar).toBe("https://github.com/greg-hass.png");
+	});
+
+	it("accepts GitHub avatar CDN URLs", () => {
+		const avatar = "https://avatars.githubusercontent.com/u/42?v=4";
+		expect(sanitizeFavouritePayload({ ...benign, ownerAvatar: avatar }, 42)?.ownerAvatar).toBe(avatar);
+	});
+
+	it("normalizes valid dates and rejects malformed dates", () => {
+		const out = sanitizeFavouritePayload(
+			{ ...benign, createdAt: "2026-01-01", pushedAt: "not-a-date" },
+			42,
+		);
+		expect(out).toBeNull();
+		const valid = sanitizeFavouritePayload(
+			{ ...benign, createdAt: "2026-01-01T00:00:00Z" },
+			42,
+		);
+		expect(valid?.createdAt).toBe("2026-01-01T00:00:00.000Z");
 	});
 
 	it("uses the route id as authoritative even when the body disagrees", () => {

@@ -57,6 +57,7 @@ describe("LiteStore", () => {
 			status: "building",
 			telegramEnabled: true,
 			alertThreshold: 25,
+			githubUnavailableAt: null,
 		});
 	});
 
@@ -75,7 +76,24 @@ describe("LiteStore", () => {
 			status: "watching",
 			telegramEnabled: false,
 			alertThreshold: 50,
+			githubUnavailableAt: null,
 		});
+	});
+
+	it("drops legacy favourites with invalid dates instead of returning broken metadata", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-lite-invalid-date-"));
+		tempDirs.push(dir);
+		await writeFile(
+			path.join(dir, "reporadar.json"),
+			JSON.stringify({
+				repos: [],
+				snapshots: [],
+				favourites: [{ ...repo, createdAt: "not-a-date" }],
+			}),
+		);
+
+		const store = new LiteStore(dir);
+		expect(await store.queryFavourites(7)).toEqual([]);
 	});
 
 	it("returns threshold-crossing Telegram candidates once and records dedupe state", async () => {

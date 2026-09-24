@@ -1,7 +1,19 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine3.24@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
+    mem_limit: 1g
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/run/postgresql:rw,noexec,nosuid,size=16m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -15,12 +27,25 @@ services:
       retries: 10
 
   app:
-    image: ghcr.io/greg-hass/reporadar:latest
-    build: .   # used when building locally instead of pulling from GHCR
+    image: ${REPORADAR_IMAGE:?set REPORADAR_IMAGE to a reviewed image digest}
     restart: unless-stopped
+    init: true
+    user: node
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
+    mem_limit: 512m
+    cpus: 0.75
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
     ports:
       - "${PORT:-3000}:3000"
     environment:
+      REPORADAR_AUTH_USER: ${REPORADAR_AUTH_USER:?set REPORADAR_AUTH_USER}
+      REPORADAR_AUTH_PASSWORD: ${REPORADAR_AUTH_PASSWORD:?set REPORADAR_AUTH_PASSWORD}
       POSTGRES_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-reporadar}
       GITHUB_SERVER_TOKEN: ${GITHUB_SERVER_TOKEN}
       CRON_SCHEDULE: ${CRON_SCHEDULE:-0 * * * *}

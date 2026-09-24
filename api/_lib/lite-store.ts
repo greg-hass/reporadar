@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { NormalizedRepo } from "./github.js";
+import { sanitizeFavouritePayload } from "./sanitize.js";
 import type {
 	AlertCandidate,
 	AlertEvent,
@@ -52,6 +53,7 @@ function defaultWatchlistMeta(): WatchlistMeta {
 		status: "watching",
 		telegramEnabled: false,
 		alertThreshold: 50,
+		githubUnavailableAt: null,
 	};
 }
 
@@ -80,19 +82,23 @@ function normalizeWatchlistMeta(value: unknown): WatchlistMeta {
 		status,
 		telegramEnabled: candidate.telegramEnabled === true,
 		alertThreshold: threshold,
+		githubUnavailableAt:
+			typeof candidate.githubUnavailableAt === "string" &&
+			Number.isFinite(Date.parse(candidate.githubUnavailableAt))
+				? new Date(candidate.githubUnavailableAt).toISOString()
+				: null,
 	};
 }
 
 function normalizeFavourite(value: unknown): FavouriteRecord | null {
 	if (typeof value !== "object" || value === null) return null;
 	const candidate = value as Record<string, unknown>;
-	if (
-		typeof candidate.id !== "number" ||
-		typeof candidate.fullName !== "string"
-	)
+	if (!Number.isSafeInteger(candidate.id) || (candidate.id as number) <= 0)
 		return null;
+	const repo = sanitizeFavouritePayload(candidate, candidate.id as number);
+	if (!repo) return null;
 	return {
-		...(candidate as unknown as NormalizedRepo),
+		...repo,
 		watchlist: normalizeWatchlistMeta(candidate.watchlist),
 	};
 }
@@ -356,11 +362,56 @@ export class LiteStore implements RepoStorage {
 	}
 
 	async listFavouriteIds(): Promise<number[]> {
-		return this.state.favourites.map((repo) => repo.id);
+		return this.state.favourites.map((favourite) => favourite.id);
+	}
+
+	async listFavouriteIdsForRefresh(): Promise<number[]> {
+		const retryBefore = Date.now() - 30 * 86_400_000;
+		return this.state.favourites
+			.filter(
+				(repo) =>
+					!repo.watchlist.githubUnavailableAt ||
+					Date.parse(repo.watchlist.githubUnavailableAt) < retryBefore,
+			)
+			.map((repo) => repo.id);
+	}
+
+	async markFavouriteUnavailable(repoId: number): Promise<void> {
+		this.state = {
+			...this.state,
+			favourites: this.state.favourites.map((favourite) =>
+				favourite.id === repoId
+					? {
+							...favourite,
+							watchlist: {
+								...favourite.watchlist,
+								githubUnavailableAt: new Date().toISOString(),
+							},
+						}
+					: favourite,
+			),
+		};
+		await this.persist();
 	}
 
 	async addFavourite(repo: NormalizedRepo): Promise<void> {
-		if (!this.state.favourites.some((favourite) => favourite.id === repo.id)) {
+		if (this.state.favourites.some((favourite) => favourite.id === repo.id)) {
+			this.state = {
+				...this.state,
+				favourites: this.state.favourites.map((favourite) =>
+					favourite.id === repo.id
+						? {
+								...favourite,
+								watchlist: {
+									...favourite.watchlist,
+									githubUnavailableAt: null,
+								},
+							}
+						: favourite,
+				),
+			};
+			await this.persist();
+		} else {
 			this.state = {
 				...this.state,
 				favourites: [

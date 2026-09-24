@@ -15,9 +15,10 @@ export interface WatchlistMeta {
 	status: WatchlistStatus;
 	telegramEnabled: boolean;
 	alertThreshold: number;
+	githubUnavailableAt: string | null;
 }
 
-export type FavouritePatch = Partial<WatchlistMeta>;
+export type FavouritePatch = Partial<Omit<WatchlistMeta, "githubUnavailableAt">>;
 
 export type WatchlistRepo = NormalizedRepo & {
 	starDelta: number | null;
@@ -103,7 +104,8 @@ CREATE TABLE IF NOT EXISTS favourites (
   status    text NOT NULL DEFAULT 'watching',
   updated_at timestamptz NOT NULL DEFAULT now(),
   telegram_enabled boolean NOT NULL DEFAULT false,
-  alert_threshold integer NOT NULL DEFAULT 50
+  alert_threshold integer NOT NULL DEFAULT 50,
+  github_unavailable_at timestamptz
 );
 
 ALTER TABLE favourites ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
@@ -112,6 +114,7 @@ ALTER TABLE favourites ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'wa
 ALTER TABLE favourites ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE favourites ADD COLUMN IF NOT EXISTS telegram_enabled boolean NOT NULL DEFAULT false;
 ALTER TABLE favourites ADD COLUMN IF NOT EXISTS alert_threshold integer NOT NULL DEFAULT 50;
+ALTER TABLE favourites ADD COLUMN IF NOT EXISTS github_unavailable_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS watchlist_alert_events (
   signature   text PRIMARY KEY,
@@ -135,41 +138,52 @@ export async function upsertAndSnapshot(
 	repos: NormalizedRepo[],
 	connStr: string,
 ): Promise<void> {
+	if (!repos.length) return;
 	const client = await getPool(connStr).connect();
 	try {
 		await client.query("BEGIN");
-		for (const r of repos) {
-			// pi-lens-ignore: no-sql-in-code
-			await client.query(
-				`INSERT INTO repos (id, full_name, description, language, topics, stars_total, forks, created_at, pushed_at, license, owner_avatar, html_url, updated_from_gh)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
+		const payload = JSON.stringify(
+			repos.map((r) => ({
+				id: r.id,
+				full_name: r.fullName,
+				description: r.description,
+				language: r.language,
+				topics: r.topics,
+				stars_total: r.starsTotal,
+				forks: r.forks,
+				created_at: r.createdAt,
+				pushed_at: r.pushedAt,
+				license: r.license,
+				owner_avatar: r.ownerAvatar,
+				html_url: r.htmlUrl,
+			})),
+		);
+		// pi-lens-ignore: no-sql-in-code
+		await client.query(
+			`INSERT INTO repos (id, full_name, description, language, topics, stars_total, forks, created_at, pushed_at, license, owner_avatar, html_url, updated_from_gh)
+         SELECT r.id, r.full_name, r.description, r.language, r.topics, r.stars_total, r.forks, r.created_at, r.pushed_at, r.license, r.owner_avatar, r.html_url, now()
+         FROM jsonb_to_recordset($1::jsonb) AS r(
+           id bigint, full_name text, description text, language text, topics text[],
+           stars_total integer, forks integer, created_at timestamptz, pushed_at timestamptz,
+           license text, owner_avatar text, html_url text
+         )
+         WHERE true
          ON CONFLICT (id) DO UPDATE SET
            full_name=excluded.full_name, description=excluded.description, language=excluded.language,
            topics=excluded.topics, stars_total=excluded.stars_total, forks=excluded.forks,
            pushed_at=excluded.pushed_at, license=excluded.license, owner_avatar=excluded.owner_avatar,
            html_url=excluded.html_url, updated_from_gh=now()`,
-				[
-					r.id,
-					r.fullName,
-					r.description,
-					r.language,
-					r.topics,
-					r.starsTotal,
-					r.forks,
-					r.createdAt,
-					r.pushedAt,
-					r.license,
-					r.ownerAvatar,
-					r.htmlUrl,
-				],
-			);
-			// pi-lens-ignore: no-sql-in-code
-			await client.query(
-				`INSERT INTO star_snapshots (repo_id, captured_at, stars) VALUES ($1, now(), $2)
+			[payload],
+		);
+		// pi-lens-ignore: no-sql-in-code
+		await client.query(
+			`INSERT INTO star_snapshots (repo_id, captured_at, stars)
+         SELECT r.id, now(), r.stars_total
+         FROM jsonb_to_recordset($1::jsonb) AS r(id bigint, stars_total integer)
+         WHERE true
          ON CONFLICT (repo_id, captured_at) DO NOTHING`,
-				[r.id, r.starsTotal],
-			);
-		}
+			[payload],
+		);
 		await client.query("COMMIT");
 	} catch (e) {
 		try {
@@ -196,7 +210,7 @@ export async function queryRisers(
 	const pool = getPool(connStr);
 	// pi-lens-ignore: no-sql-in-code
 	const res = await pool.query(
-		`WITH latest AS (
+		`WITH latest AS MATERIALIZED (
          -- The tracker writes general candidates and favourites in separate
          -- transactions. Pick the newest snapshot for each repo instead of
          -- treating the later batch as the only global "latest" snapshot.
@@ -204,7 +218,7 @@ export async function queryRisers(
          FROM star_snapshots
          ORDER BY repo_id, captured_at DESC
        ),
-       past AS (
+       past AS MATERIALIZED (
          SELECT DISTINCT ON (repo_id) repo_id, stars AS past_stars
          FROM star_snapshots
          WHERE captured_at >= now() - ($1 || ' days')::interval
@@ -454,14 +468,38 @@ export async function listFavouriteIds(connStr: string): Promise<number[]> {
 	return res.rows.map((r) => r.repo_id as number);
 }
 
+export async function listFavouriteIdsForRefresh(
+	connStr: string,
+): Promise<number[]> {
+	// pi-lens-ignore: no-sql-in-code
+	const res = await getPool(connStr).query(
+		`SELECT repo_id FROM favourites
+         WHERE github_unavailable_at IS NULL
+            OR github_unavailable_at < now() - '30 days'::interval`,
+	);
+	return res.rows.map((r) => r.repo_id as number);
+}
+
 export async function addFavourite(
 	connStr: string,
 	repo: NormalizedRepo,
 ): Promise<void> {
 	// pi-lens-ignore: no-sql-in-code
 	await getPool(connStr).query(
-		`INSERT INTO favourites (repo_id, payload) VALUES ($1, $2) ON CONFLICT (repo_id) DO NOTHING`,
+		`INSERT INTO favourites (repo_id, payload) VALUES ($1, $2)
+         ON CONFLICT (repo_id) DO UPDATE SET github_unavailable_at = NULL`,
 		[repo.id, JSON.stringify(repo)],
+	);
+}
+
+export async function markFavouriteUnavailable(
+	connStr: string,
+	repoId: number,
+): Promise<void> {
+	// pi-lens-ignore: no-sql-in-code
+	await getPool(connStr).query(
+		`UPDATE favourites SET github_unavailable_at = now() WHERE repo_id = $1`,
+		[repoId],
 	);
 }
 
@@ -515,6 +553,7 @@ function watchlistMetaFromRow(row: {
 	status?: unknown;
 	telegramEnabled?: unknown;
 	alertThreshold?: unknown;
+	githubUnavailableAt?: unknown;
 }): WatchlistMeta {
 	const threshold =
 		typeof row.alertThreshold === "number" &&
@@ -530,6 +569,12 @@ function watchlistMetaFromRow(row: {
 		status: isWatchlistStatus(row.status) ? row.status : "watching",
 		telegramEnabled: row.telegramEnabled === true,
 		alertThreshold: threshold,
+		githubUnavailableAt:
+			typeof row.githubUnavailableAt === "string"
+				? row.githubUnavailableAt
+				: row.githubUnavailableAt instanceof Date
+					? row.githubUnavailableAt.toISOString()
+					: null,
 	};
 }
 
@@ -558,8 +603,16 @@ export async function queryFavourites(
               COALESCE(r.topics, ARRAY(SELECT jsonb_array_elements_text(f.payload->'topics'))) AS topics,
               COALESCE(r.stars_total, (f.payload->>'starsTotal')::int) AS "starsTotal",
               COALESCE(r.forks, (f.payload->>'forks')::int) AS forks,
-              COALESCE(r.created_at, (f.payload->>'createdAt')::timestamptz) AS "createdAt",
-              COALESCE(r.pushed_at, (f.payload->>'pushedAt')::timestamptz) AS "pushedAt",
+              COALESCE(r.created_at, CASE
+                WHEN pg_input_is_valid(f.payload->>'createdAt', 'timestamptz')
+                  THEN (f.payload->>'createdAt')::timestamptz
+                ELSE now()
+              END) AS "createdAt",
+              COALESCE(r.pushed_at, CASE
+                WHEN pg_input_is_valid(f.payload->>'pushedAt', 'timestamptz')
+                  THEN (f.payload->>'pushedAt')::timestamptz
+                ELSE now()
+              END) AS "pushedAt",
               COALESCE(r.license, f.payload->>'license') AS license,
               COALESCE(r.owner_avatar, f.payload->>'ownerAvatar') AS "ownerAvatar",
               COALESCE(r.html_url, f.payload->>'htmlUrl') AS "htmlUrl",
@@ -568,6 +621,7 @@ export async function queryFavourites(
               f.status,
               f.telegram_enabled AS "telegramEnabled",
               f.alert_threshold AS "alertThreshold",
+              f.github_unavailable_at AS "githubUnavailableAt",
               (latest.stars - COALESCE(past.past_stars, latest.stars)) AS delta
        FROM favourites f
        LEFT JOIN repos r ON r.id = f.repo_id
@@ -583,6 +637,7 @@ export async function queryFavourites(
 		status?: unknown;
 		telegramEnabled?: unknown;
 		alertThreshold?: unknown;
+		githubUnavailableAt?: unknown;
 	})[];
 	const ids = rows.map((r) => r.id);
 	const historyMap: Record<number, number[]> = {};
@@ -606,6 +661,7 @@ export async function queryFavourites(
 			status,
 			telegramEnabled,
 			alertThreshold,
+			githubUnavailableAt,
 			...repo
 		}) => ({
 			...repo,
@@ -617,6 +673,7 @@ export async function queryFavourites(
 				status,
 				telegramEnabled,
 				alertThreshold,
+				githubUnavailableAt,
 			}),
 		}),
 	);

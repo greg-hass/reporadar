@@ -25,7 +25,7 @@ export default function CompareButton({ repo, label = false }: { repo: Repo; lab
       className={`flex shrink-0 items-center gap-1.5 transition-colors ${
         label
           ? `rounded-lg border px-3 py-2 text-xs font-semibold ${selected ? "border-accent/50 bg-accent/10 text-accent" : "border-border text-muted hover:text-text"}`
-          : selected ? "text-accent" : "text-muted/50 hover:text-accent"
+          : `h-10 w-10 justify-center rounded-lg ${selected ? "text-accent" : "text-muted/50 hover:text-accent"}`
       }`}
     >
       {selected ? <CheckIcon size={label ? 14 : 13} /> : <CompareIcon size={label ? 14 : 13} />}

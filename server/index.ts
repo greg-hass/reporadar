@@ -1,4 +1,6 @@
 import express, { type Express } from "express";
+import { createHash, timingSafeEqual } from "node:crypto";
+import compression from "compression";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
@@ -20,11 +22,12 @@ import {
 import type { AlertCandidate } from "../api/_lib/db";
 import {
 	sanitizeFavouritePatch,
-	sanitizeFavouritePayload,
 } from "../api/_lib/sanitize";
 
 export interface AppConfig extends StorageConfig {
 	port?: number;
+	authUsername?: string;
+	authPassword?: string;
 	githubToken?: string;
 	cronSchedule?: string;
 	telegramBridgeCli?: string;
@@ -66,6 +69,8 @@ function optionalHour(value: string | undefined): number | undefined {
 function readConfig(): AppConfig {
 	return {
 		port: Number(process.env.PORT ?? 3000),
+		authUsername: process.env.REPORADAR_AUTH_USER,
+		authPassword: process.env.REPORADAR_AUTH_PASSWORD,
 		githubToken: process.env.GITHUB_SERVER_TOKEN || undefined,
 		mode: process.env.REPORADAR_MODE,
 		postgresUrl: process.env.POSTGRES_URL,
@@ -83,6 +88,77 @@ function readConfig(): AppConfig {
 			1_000,
 			Number(process.env.REPORADAR_TELEGRAM_TIMEOUT_MS) || 30_000,
 		),
+	};
+}
+
+function apiAuthentication(config: AppConfig): express.RequestHandler {
+	const username = config.authUsername;
+	const password = config.authPassword;
+	if (
+		!username ||
+		username.length > 128 ||
+		username.includes(":") ||
+		!password ||
+		password.length < 16 ||
+		password.length > 512
+	) {
+		throw new Error(
+			"REPORADAR_AUTH_USER (max 128 chars) and REPORADAR_AUTH_PASSWORD (16–512 chars) are required",
+		);
+	}
+	const expected = createHash("sha256")
+		.update(`${username}:${password}`)
+		.digest();
+
+	return (req, res, next) => {
+		res.set("Cache-Control", "no-store");
+		const authorization = req.get("authorization") ?? "";
+		const match = /^Basic ([A-Za-z0-9+/]+={0,2})$/i.exec(authorization);
+		let supplied = Buffer.alloc(0);
+		if (match && match[1].length <= 1368) {
+			const decoded = Buffer.from(match[1], "base64");
+			if (decoded.toString("base64") === match[1]) supplied = decoded;
+		}
+		const actual = createHash("sha256").update(supplied).digest();
+		if (timingSafeEqual(actual, expected)) {
+			if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+				const origin = req.get("origin");
+				if (origin) {
+					try {
+						if (new URL(origin).host !== (req.get("host") ?? "").toLowerCase()) {
+							res.status(403).json({ error: "cross-origin request rejected" });
+							return;
+						}
+					} catch {
+						res.status(403).json({ error: "cross-origin request rejected" });
+						return;
+					}
+				}
+			}
+			next();
+			return;
+		}
+		res.set("WWW-Authenticate", 'Basic realm="RepoRadar", charset="UTF-8"');
+		res.status(401).json({ error: "authentication required" });
+	};
+}
+
+function searchRateLimiter(): express.RequestHandler {
+	let windowStartedAt = Date.now();
+	let requests = 0;
+	return (_req, res, next) => {
+		const now = Date.now();
+		if (now - windowStartedAt >= 60_000) {
+			windowStartedAt = now;
+			requests = 0;
+		}
+		requests += 1;
+		if (requests > 60) {
+			res.set("Retry-After", "60");
+			res.status(429).json({ error: "search request limit reached; retry shortly" });
+			return;
+		}
+		next();
 	};
 }
 
@@ -119,7 +195,7 @@ function favouriteIds(value: unknown): number[] | null {
 	const ids = value
 		.filter(
 			(id): id is number =>
-				typeof id === "number" && Number.isInteger(id) && id > 0,
+				typeof id === "number" && Number.isSafeInteger(id) && id > 0,
 		)
 		.slice(0, 100);
 	return ids.length ? [...new Set(ids)] : null;
@@ -130,33 +206,80 @@ export function createApp(
 	storage = createStorage(config),
 ): Express {
 	const app = express();
-	app.use(express.json());
+	app.use((_req, res, next) => {
+		res.set({
+			"Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+			"X-Content-Type-Options": "nosniff",
+			"X-Frame-Options": "DENY",
+			"Referrer-Policy": "strict-origin-when-cross-origin",
+			"Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+			"Strict-Transport-Security": "max-age=31536000",
+		});
+		next();
+	});
+	app.use(apiAuthentication(config));
+	app.use(compression());
+	app.set("query parser", "simple");
+	app.use("/api/search", searchRateLimiter());
+	app.use(express.json({ limit: "32kb" }));
 
 	app.get("/api/search", async (req, res) => {
-		const q = ONE(req.query.q);
-		if (!q) {
+		const q = ONE(req.query.q)?.trim();
+		if (!q || q.length > 256) {
 			res.status(400).json({ error: "q is required" });
 			return;
 		}
 		const topicsRaw = ONE(req.query.topics);
+		const topics = topicsRaw ? topicsRaw.split(",").filter(Boolean) : undefined;
+		const minStarsRaw = ONE(req.query.minStars);
+		const createdDaysRaw = ONE(req.query.createdSinceDays);
+		const pushedDaysRaw = ONE(req.query.pushedSinceDays);
+		const pageRaw = ONE(req.query.page);
+		const language = ONE(req.query.language);
+		const sort = ONE(req.query.sort);
+		const minStars = minStarsRaw === undefined ? undefined : Number(minStarsRaw);
+		const createdSinceDays =
+			createdDaysRaw === undefined ? undefined : Number(createdDaysRaw);
+		const pushedSinceDays =
+			pushedDaysRaw === undefined ? undefined : Number(pushedDaysRaw);
+		const page = pageRaw === undefined ? undefined : Number(pageRaw);
+		if (
+			(topics && (topics.length > 10 || topics.some((topic) => topic.length > 50))) ||
+			(language !== undefined && language.length > 40) ||
+			(sort !== undefined && !["best-match", "stars", "updated"].includes(sort)) ||
+			(minStars !== undefined && (!Number.isFinite(minStars) || minStars < 0 || minStars > 1_000_000_000)) ||
+			(createdSinceDays !== undefined && (!Number.isFinite(createdSinceDays) || createdSinceDays < 1 || createdSinceDays > 3650)) ||
+			(pushedSinceDays !== undefined && (!Number.isFinite(pushedSinceDays) || pushedSinceDays < 1 || pushedSinceDays > 3650)) ||
+			(page !== undefined && (!Number.isInteger(page) || page < 1 || page > 34))
+		) {
+			res.status(400).json({ error: "search filters are outside supported limits" });
+			return;
+		}
+		const effectiveQueryLength = [
+			q,
+			language ? `language:${language}` : "",
+			...(topics ?? []).map((topic) => `topic:${topic}`),
+			minStars === undefined ? "" : `stars:>=${minStars}`,
+		]
+			.filter(Boolean)
+			.join(" ").length;
+		if (effectiveQueryLength > 256) {
+			res.status(400).json({ error: "combined search query must be 256 characters or fewer" });
+			return;
+		}
 		const query: SearchQuery = {
 			q,
-			language: ONE(req.query.language) || undefined,
-			topics: topicsRaw ? topicsRaw.split(",").filter(Boolean) : undefined,
-			minStars: req.query.minStars
-				? Number(ONE(req.query.minStars))
-				: undefined,
-			createdSinceDays: req.query.createdSinceDays
-				? Number(ONE(req.query.createdSinceDays))
-				: undefined,
-			pushedSinceDays: req.query.pushedSinceDays
-				? Number(ONE(req.query.pushedSinceDays))
-				: undefined,
-			sort: ONE(req.query.sort),
-			page: req.query.page ? Number(ONE(req.query.page)) : undefined,
+			language: language || undefined,
+			topics,
+			minStars,
+			createdSinceDays,
+			pushedSinceDays,
+			sort,
+			page,
 		};
 		try {
-			res.json(await githubSearch(query, config.githubToken ?? ""));
+			const result = await githubSearch(query, config.githubToken ?? "");
+			res.json(result);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "search failed";
 			res
@@ -220,8 +343,8 @@ export function createApp(
 
 	app.get("/api/repos/:id/history", async (req, res) => {
 		const id = Number(req.params.id);
-		if (!Number.isFinite(id)) {
-			res.status(400).json({ error: "repo id must be a number" });
+		if (!Number.isSafeInteger(id) || id <= 0) {
+			res.status(400).json({ error: "repo id must be a positive integer" });
 			return;
 		}
 		try {
@@ -298,22 +421,30 @@ export function createApp(
 
 	app.put("/api/favourites/:id", async (req, res) => {
 		const id = Number(req.params.id);
-		if (!Number.isFinite(id)) {
-			res.status(400).json({ error: "repo id must be a number" });
-			return;
-		}
-		const repo = sanitizeFavouritePayload(req.body, id);
-		if (!repo) {
-			res.status(400).json({ error: "repo payload required" });
+		if (!Number.isSafeInteger(id) || id <= 0) {
+			res.status(400).json({ error: "repo id must be a positive integer" });
 			return;
 		}
 		try {
+			const requestedName = req.body?.fullName;
+			const cached =
+				typeof requestedName === "string"
+					? await storage.queryRepoByName(requestedName)
+					: null;
+			const repo =
+				cached?.id === id
+					? cached
+					: await githubRepoById(id, config.githubToken ?? "");
 			await storage.addFavourite(repo);
 			res.json({ ok: true });
 		} catch (error) {
-			res.status(500).json({
-				error: error instanceof Error ? error.message : "favourite failed",
-			});
+			const message = error instanceof Error ? error.message : "favourite failed";
+			const status = message.startsWith("GitHub 404")
+				? 404
+				: message.startsWith("GitHub 403")
+					? 429
+					: 500;
+			res.status(status).json({ error: message });
 		}
 	});
 
@@ -339,7 +470,7 @@ export function createApp(
 	app.patch("/api/favourites/:id", async (req, res) => {
 		const id = Number(req.params.id);
 		const patch = sanitizeFavouritePatch(req.body);
-		if (!Number.isInteger(id) || id <= 0 || !patch) {
+		if (!Number.isSafeInteger(id) || id <= 0 || !patch) {
 			res.status(400).json({ error: "repo id and a valid patch are required" });
 			return;
 		}
@@ -356,8 +487,8 @@ export function createApp(
 
 	app.delete("/api/favourites/:id", async (req, res) => {
 		const id = Number(req.params.id);
-		if (!Number.isFinite(id)) {
-			res.status(400).json({ error: "repo id must be a number" });
+		if (!Number.isSafeInteger(id) || id <= 0) {
+			res.status(400).json({ error: "repo id must be a positive integer" });
 			return;
 		}
 		try {
@@ -371,7 +502,17 @@ export function createApp(
 	});
 
 	const distDir = resolveDistDir();
-	app.use(express.static(distDir));
+	app.use(
+		express.static(distDir, {
+			setHeaders: (res, filePath) => {
+				if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+					res.set("Cache-Control", "public, max-age=31536000, immutable");
+				} else {
+					res.set("Cache-Control", "no-cache");
+				}
+			},
+		}),
+	);
 	app.get("*", (_req, res) => {
 		res.sendFile(path.join(distDir, "index.html"));
 	});
@@ -558,17 +699,30 @@ export async function runTrackingJob(
 	if (candidates.length) await storage.upsertAndSnapshot(candidates);
 
 	try {
-		const favouriteIds = await storage.listFavouriteIds();
+		const favouriteIds = await storage.listFavouriteIdsForRefresh();
 		const favouriteRepos: NormalizedRepo[] = [];
-		for (const id of favouriteIds) {
-			try {
-				favouriteRepos.push(await githubRepoById(id, config.githubToken ?? ""));
-			} catch (error) {
-				console.error(
-					`[cron] favourite ${id} refresh failed:`,
-					error instanceof Error ? error.message : error,
-				);
-			}
+		const concurrency = 6;
+		for (let i = 0; i < favouriteIds.length; i += concurrency) {
+			const batch = favouriteIds.slice(i, i + concurrency);
+			const refreshed = await Promise.all(
+				batch.map(async (id) => {
+					try {
+						return await githubRepoById(id, config.githubToken ?? "");
+					} catch (error) {
+						if (error instanceof Error && error.message.startsWith("GitHub 404")) {
+							await storage.markFavouriteUnavailable(id);
+						}
+						console.error(
+							`[cron] favourite ${id} refresh failed:`,
+							error instanceof Error ? error.message : error,
+						);
+						return null;
+					}
+				}),
+			);
+			favouriteRepos.push(
+				...refreshed.filter((repo): repo is NormalizedRepo => repo !== null),
+			);
 		}
 		if (favouriteRepos.length) await storage.upsertAndSnapshot(favouriteRepos);
 	} catch (error) {
@@ -584,6 +738,19 @@ export async function runTrackingJob(
 export function startServer(config: AppConfig = readConfig()) {
 	const storage = createStorage(config);
 	const app = createApp(config, storage);
+	let trackingJobRunning = false;
+	const runTrackingJobOnce = async () => {
+		if (trackingJobRunning) {
+			console.warn("[cron] skipping overlapping tracking run");
+			return;
+		}
+		trackingJobRunning = true;
+		try {
+			await runTrackingJob(config, storage);
+		} finally {
+			trackingJobRunning = false;
+		}
+	};
 	return app.listen(config.port ?? 3000, () => {
 		console.log(`RepoRadar listening on :${config.port ?? 3000}`);
 		void (async () => {
@@ -601,7 +768,7 @@ export function startServer(config: AppConfig = readConfig()) {
 			const schedule = config.cronSchedule ?? "0 * * * *";
 			if (cron.validate(schedule)) {
 				cron.schedule(schedule, () => {
-					runTrackingJob(config, storage).catch((error) => {
+					runTrackingJobOnce().catch((error) => {
 						console.error(
 							"[cron] job failed:",
 							error instanceof Error ? error.message : error,
@@ -613,7 +780,7 @@ export function startServer(config: AppConfig = readConfig()) {
 				console.warn(`[cron] invalid CRON_SCHEDULE "${schedule}", skipping`);
 			}
 			try {
-				await runTrackingJob(config, storage);
+				await runTrackingJobOnce();
 			} catch (error) {
 				console.error(
 					"[cron] seed run failed:",

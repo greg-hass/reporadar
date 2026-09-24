@@ -5,6 +5,8 @@ A GitHub discovery dashboard — search repos, browse new repos, and see **fast 
 ## Quick start (lite mode, no Postgres)
 
 ```bash
+cp .env.example .env
+# Set REPORADAR_AUTH_USER and REPORADAR_AUTH_PASSWORD in .env
 docker compose -f docker-compose.lite.yml up -d --build
 open http://localhost:3000
 ```
@@ -15,9 +17,10 @@ Lite mode needs no `.env`, GitHub token, or database. It stores favourites and s
 
 ```bash
 cp .env.example .env
-# Set GITHUB_SERVER_TOKEN in .env
+# Set REPORADAR_IMAGE from the GitHub Actions summary, plus auth and GitHub settings.
 
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 open http://localhost:3000
 ```
 
@@ -25,11 +28,11 @@ Durable mode uses Postgres and a server-side token for hourly tracking. The data
 
 ## Updating (prebuilt image from GHCR)
 
-Every push to `main` builds and publishes `ghcr.io/greg-hass/reporadar:latest` via GitHub Actions (see `.github/workflows/docker.yml`). On the server:
+Every push to `main` builds the image and publishes a content digest through GitHub Actions (see `.github/workflows/docker.yml`). The workflow summary prints the immutable image reference. Set `REPORADAR_IMAGE` in Dockge or `.env` to that full `ghcr.io/greg-hass/reporadar@sha256:...` reference, then update the stack:
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose pull app
+docker compose up -d app
 ```
 
 If the GHCR package is private (the default), log in on the server once first:
@@ -94,6 +97,9 @@ Every list supports keyboard navigation: `j` / `k` to move, `↵` to open, `/` t
 | `REPORADAR_TELEGRAM_QUIET_END` | no | — | Local server hour (0–23) at which Telegram delivery resumes |
 | `REPORADAR_TELEGRAM_TIMEOUT_MS` | no | `30000` | Maximum time to wait for one bridge delivery |
 | `PORT` | no | `3000` | Host port |
+| `REPORADAR_AUTH_USER` | yes | — | Username for the app's HTTP Basic Auth prompt |
+| `REPORADAR_AUTH_PASSWORD` | yes | — | Unique password of at least 16 characters |
+| `REPORADAR_IMAGE` | durable mode | — | Reviewed application image reference pinned by digest |
 
 ## Development (without Docker)
 

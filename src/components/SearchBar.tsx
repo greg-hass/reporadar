@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SearchIcon } from "./icons";
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
 }
 
 export default function SearchBar({ initial, onSearch }: Props) {
+  const inputId = useId();
   const [value, setValue] = useState(initial);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,11 +33,13 @@ export default function SearchBar({ initial, onSearch }: Props) {
       className="flex min-w-0 w-full gap-2"
     >
       <div className="relative min-w-0 flex-1">
+        <label htmlFor={inputId} className="sr-only">Search GitHub repositories</label>
         <SearchIcon
           size={17}
           className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
         />
         <input
+          id={inputId}
           ref={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}

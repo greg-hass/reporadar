@@ -26,7 +26,7 @@ const repoPayload = {
 	pushed_at: "2026-01-02T00:00:00Z",
 	license: { spdx_id: "MIT" },
 	owner: {
-		avatar_url: "https://example.com/avatar.png",
+		avatar_url: "https://avatars.githubusercontent.com/u/42?v=4",
 		html_url: "https://github.com/greg-hass",
 	},
 	html_url: "https://github.com/greg-hass/reporadar",
@@ -34,6 +34,50 @@ const repoPayload = {
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
+const testAuth = {
+	username: "test-user",
+	password: "test-password-at-least-16",
+};
+const testAuthorization = `Basic ${Buffer.from(`${testAuth.username}:${testAuth.password}`).toString("base64")}`;
+
+function testAppConfig(config: AppConfig): AppConfig {
+	return { ...config, authUsername: testAuth.username, authPassword: testAuth.password };
+}
+
+function apiFetch(input: string | URL | Request, init: RequestInit = {}) {
+	const headers = new Headers(init.headers);
+	headers.set("Authorization", testAuthorization);
+	return fetch(input, { ...init, headers });
+}
+
+function mockGitHubRepoLookup(notFoundIds: number[] = []) {
+	const originalFetch = globalThis.fetch;
+	vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+		const url = String(input);
+		const match = /https:\/\/api\.github\.com\/repositories\/(\d+)$/.exec(url);
+		if (!match) return originalFetch(input, init);
+		const id = Number(match[1]);
+		if (notFoundIds.includes(id)) return new Response("Not Found", { status: 404 });
+		return new Response(JSON.stringify({ ...repoPayload, id }), {
+			status: 200,
+			headers: { "Content-Type": "application/json" },
+		});
+	});
+}
+
+function mockGitHubSearch() {
+	const originalFetch = globalThis.fetch;
+	vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+		const url = String(input);
+		if (url.startsWith("https://api.github.com/search/repositories")) {
+			return new Response(JSON.stringify({ total_count: 0, items: [] }), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+		return originalFetch(input, init);
+	});
+}
 
 afterEach(async () => {
 	vi.useRealTimers();
@@ -62,6 +106,10 @@ async function listen(app: ReturnType<typeof createApp>): Promise<string> {
 }
 
 describe("RepoRadar API", () => {
+	it("requires valid credentials to create the app", () => {
+		expect(() => createApp({ mode: "lite" })).toThrow(/REPORADAR_AUTH_USER/);
+	});
+
 	it("resolves frontend assets from source and compiled server layouts", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-dist-"));
 		tempDirs.push(dir);
@@ -149,24 +197,47 @@ describe("RepoRadar API", () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-api-"));
 		tempDirs.push(dir);
 		const config: AppConfig = { mode: "lite", dataDir: dir };
-		const baseUrl = await listen(createApp(config));
+		const baseUrl = await listen(createApp(testAppConfig(config)));
 
 		const missingQuery = await fetch(`${baseUrl}/api/search`);
-		expect(missingQuery.status).toBe(400);
+		expect(missingQuery.status).toBe(401);
+		expect(missingQuery.headers.get("www-authenticate")).toContain("Basic");
+		const authorizedMissingQuery = await apiFetch(`${baseUrl}/api/search`);
+		expect(authorizedMissingQuery.status).toBe(400);
 
-		const stats = await fetch(`${baseUrl}/api/stats`);
+		const stats = await apiFetch(`${baseUrl}/api/stats`);
 		expect(stats.status).toBe(200);
+		expect(stats.headers.get("cache-control")).toBe("no-store");
+		expect(stats.headers.get("x-content-type-options")).toBe("nosniff");
+		expect(stats.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
 		expect(await stats.json()).toMatchObject({
 			reposTracked: 0,
 			snapshotsToday: 0,
 		});
 
-		const pulse = await fetch(`${baseUrl}/api/pulse?since=not-a-date`);
+		const pulse = await apiFetch(`${baseUrl}/api/pulse?since=not-a-date`);
 		expect(pulse.status).toBe(200);
+		expect(pulse.headers.get("cache-control")).toBe("no-store");
 		expect(await pulse.json()).toMatchObject({
 			items: [],
 			stats: { reposTracked: 0, snapshotCount: 0, trackedSince: null },
 		});
+	});
+
+	it("bounds GitHub search requests and rejects oversized queries", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-search-limit-"));
+		tempDirs.push(dir);
+		mockGitHubSearch();
+		const baseUrl = await listen(createApp(testAppConfig({ mode: "lite", dataDir: dir })));
+		const oversized = await apiFetch(`${baseUrl}/api/search?q=${"x".repeat(257)}`);
+		expect(oversized.status).toBe(400);
+
+		let last: Response | undefined;
+		for (let i = 0; i < 61; i += 1) {
+			last = await apiFetch(`${baseUrl}/api/search?q=repo-${i}`);
+		}
+		expect(last?.status).toBe(429);
+		expect(last?.headers.get("retry-after")).toBe("60");
 	});
 
 	it("lets the lite tracking job seed a local snapshot anonymously", async () => {
@@ -195,12 +266,105 @@ describe("RepoRadar API", () => {
 		});
 	});
 
-	it("sanitizes hostile favourite payloads before storing them", async () => {
+	it("preserves watchlist metadata when GitHub reports a repository missing", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-cron-missing-"));
+		tempDirs.push(dir);
+		const requests: string[] = [];
+		vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0]) => {
+			const url = String(input);
+			requests.push(url);
+			if (url.includes("/search/repositories"))
+				return new Response(JSON.stringify({ total_count: 0, items: [] }), {
+					status: 200,
+				});
+			return new Response("Not Found", { status: 404 });
+		});
+		const config: AppConfig = { mode: "lite", dataDir: dir };
+		const storage = createStorage(config);
+		await storage.addFavourite({
+			id: 999,
+			fullName: "deleted/repository",
+			description: null,
+			language: null,
+			topics: [],
+			starsTotal: 0,
+			forks: 0,
+			createdAt: "2026-01-01T00:00:00.000Z",
+			pushedAt: "2026-01-01T00:00:00.000Z",
+			license: null,
+			ownerAvatar: "https://github.com/deleted.png",
+			htmlUrl: "https://github.com/deleted/repository",
+		});
+
+		await runTrackingJob(config, storage);
+		const restartedStorage = createStorage(config);
+		await runTrackingJob(config, restartedStorage);
+
+		expect(requests.filter((url) => url.endsWith("/repositories/999"))).toHaveLength(1);
+		expect(await restartedStorage.listFavouriteIds()).toEqual([999]);
+		expect(await restartedStorage.listFavouriteIdsForRefresh()).toEqual([]);
+		expect(await restartedStorage.queryFavourites(7)).toMatchObject([
+			{
+				id: 999,
+				fullName: "deleted/repository",
+				watchlist: { githubUnavailableAt: expect.any(String) },
+			},
+		]);
+	});
+
+	it("uses matching cached repository metadata when GitHub is unavailable", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-cached-"));
+		tempDirs.push(dir);
+		const originalFetch = globalThis.fetch;
+		const fetchMock = vi.fn((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+			if (String(input).startsWith("https://api.github.com/")) {
+				return Promise.reject(new Error("GitHub unavailable"));
+			}
+			return originalFetch(input, init);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const config = testAppConfig({ mode: "lite", dataDir: dir });
+		const storage = createStorage(config);
+		await storage.upsertAndSnapshot([
+			{
+				id: 7,
+				fullName: "greg-hass/reporadar",
+				description: "A dashboard",
+				language: "TypeScript",
+				topics: ["github"],
+				starsTotal: 12,
+				forks: 2,
+				createdAt: "2026-01-01T00:00:00Z",
+				pushedAt: "2026-01-02T00:00:00Z",
+				license: "MIT",
+				ownerAvatar: "https://avatars.githubusercontent.com/u/42?v=4",
+				htmlUrl: "https://github.com/greg-hass/reporadar",
+			},
+		]);
+		const baseUrl = await listen(createApp(config, storage));
+
+		const put = await apiFetch(`${baseUrl}/api/favourites/7`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ fullName: "greg-hass/reporadar" }),
+		});
+
+		expect(put.status).toBe(200);
+		expect(
+			fetchMock.mock.calls.filter(([input]) =>
+				String(input).startsWith("https://api.github.com/"),
+			),
+		).toHaveLength(0);
+		expect(await storage.listFavouriteIds()).toEqual([7]);
+	});
+
+	it("stores canonical GitHub data instead of trusting favourite payloads", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
+		mockGitHubRepoLookup();
+		const baseUrl = await listen(createApp(testAppConfig({ mode: "lite", dataDir: dir })));
 
-		const put = await fetch(`${baseUrl}/api/favourites/7`, {
+		const put = await apiFetch(`${baseUrl}/api/favourites/7`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -216,22 +380,31 @@ describe("RepoRadar API", () => {
 			}),
 		});
 		expect(put.status).toBe(200);
+		const crossOrigin = await apiFetch(`${baseUrl}/api/favourites/8`, {
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/json",
+				Origin: "https://attacker.example",
+			},
+			body: JSON.stringify({ ...repoPayload, id: 8 }),
+		});
+		expect(crossOrigin.status).toBe(403);
 
-		const ids = await fetch(`${baseUrl}/api/favourites/ids`);
+		const ids = await apiFetch(`${baseUrl}/api/favourites/ids`);
 		const { ids: storedIds } = (await ids.json()) as { ids: number[] };
 		expect(storedIds).toEqual([7]);
 
-		const favourites = await fetch(`${baseUrl}/api/favourites`);
+		const favourites = await apiFetch(`${baseUrl}/api/favourites`);
 		const { items } = (await favourites.json()) as {
 			items: Array<Record<string, unknown>>;
 		};
 		expect(items[0]).toMatchObject({
 			id: 7,
-			fullName: "attacker/pwn",
-			htmlUrl: "https://github.com/attacker/pwn",
-			ownerAvatar: "https://github.com/attacker.png",
-			starsTotal: 0,
-			topics: ["a".repeat(100)],
+			fullName: "greg-hass/reporadar",
+			htmlUrl: "https://github.com/greg-hass/reporadar",
+			ownerAvatar: "https://avatars.githubusercontent.com/u/42?v=4",
+			starsTotal: 12,
+			topics: ["github"],
 		});
 		expect(items[0]).not.toHaveProperty("extra");
 	});
@@ -239,10 +412,11 @@ describe("RepoRadar API", () => {
 	it("persists single and bulk watchlist metadata updates", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-meta-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
+		mockGitHubRepoLookup();
+		const baseUrl = await listen(createApp(testAppConfig({ mode: "lite", dataDir: dir })));
 
 		for (const id of [42, 43]) {
-			const put = await fetch(`${baseUrl}/api/favourites/${id}`, {
+			const put = await apiFetch(`${baseUrl}/api/favourites/${id}`, {
 				method: "PUT",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -263,7 +437,7 @@ describe("RepoRadar API", () => {
 			expect(put.status).toBe(200);
 		}
 
-		const bulk = await fetch(`${baseUrl}/api/favourites`, {
+		const bulk = await apiFetch(`${baseUrl}/api/favourites`, {
 			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -274,14 +448,14 @@ describe("RepoRadar API", () => {
 		expect(bulk.status).toBe(200);
 		expect(await bulk.json()).toEqual({ ok: true, updated: 2 });
 
-		const single = await fetch(`${baseUrl}/api/favourites/42`, {
+		const single = await apiFetch(`${baseUrl}/api/favourites/42`, {
 			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ note: "Review this" }),
 		});
 		expect(single.status).toBe(200);
 
-		const favourites = await fetch(`${baseUrl}/api/favourites`);
+		const favourites = await apiFetch(`${baseUrl}/api/favourites`);
 		const { items } = (await favourites.json()) as {
 			items: Array<{ id: number; watchlist: unknown }>;
 		};
@@ -292,6 +466,7 @@ describe("RepoRadar API", () => {
 			status: "building",
 			telegramEnabled: false,
 			alertThreshold: 50,
+			githubUnavailableAt: null,
 		});
 		expect(items.find((item) => item.id === 43)?.watchlist).toEqual({
 			tags: ["frontend"],
@@ -299,22 +474,28 @@ describe("RepoRadar API", () => {
 			status: "building",
 			telegramEnabled: false,
 			alertThreshold: 50,
+			githubUnavailableAt: null,
 		});
 	});
 
-	it("rejects malformed favourite payloads", async () => {
+	it("rejects invalid favourite IDs and nonexistent GitHub repositories", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-fav-bad-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
+		mockGitHubRepoLookup([404]);
+		const baseUrl = await listen(createApp(testAppConfig({ mode: "lite", dataDir: dir })));
 
-		const bad = await fetch(`${baseUrl}/api/favourites/1`, {
+		const bad = await apiFetch(`${baseUrl}/api/favourites/1.5`, {
 			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ id: 1, fullName: "not-a-valid-name" }),
 		});
 		expect(bad.status).toBe(400);
+		const nonexistent = await apiFetch(`${baseUrl}/api/favourites/404`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ fullName: "owner/name" }),
+		});
+		expect(nonexistent.status).toBe(404);
 
-		const nonNumber = await fetch(`${baseUrl}/api/favourites/not-a-number`, {
+		const nonNumber = await apiFetch(`${baseUrl}/api/favourites/not-a-number`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ fullName: "owner/name" }),
@@ -325,9 +506,9 @@ describe("RepoRadar API", () => {
 	it("defaults a malformed days window instead of 500ing", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "reporadar-days-"));
 		tempDirs.push(dir);
-		const baseUrl = await listen(createApp({ mode: "lite", dataDir: dir }));
+		const baseUrl = await listen(createApp(testAppConfig({ mode: "lite", dataDir: dir })));
 
-		const response = await fetch(`${baseUrl}/api/repos/42/history?days=abc`);
+		const response = await apiFetch(`${baseUrl}/api/repos/42/history?days=abc`);
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ points: [] });
 	});
